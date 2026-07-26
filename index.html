@@ -23,7 +23,7 @@
     font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif;
     padding:20px 16px 90px;
   }
-  .wrap { max-width:1500px; margin:0 auto; }
+  .wrap { max-width:1800px; margin:0 auto; }
 
   /* ---- header ---- */
   .top { display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:14px; }
@@ -36,8 +36,17 @@
   .stat b { display:block; font-size:21px; line-height:1.1; }
   .stat span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
 
+  /* ---- tabs ---- */
+  .tabs { display:flex; gap:4px; margin:22px 0 0; border-bottom:1px solid var(--line); }
+  .tab { border:0; background:transparent; color:var(--muted); font-size:15px; font-weight:600;
+         padding:10px 16px; border-radius:10px 10px 0 0; border-bottom:2px solid transparent;
+         margin-bottom:-1px; cursor:pointer; }
+  .tab:hover { color:var(--ink); }
+  .tab.on { color:var(--accent); border-bottom-color:var(--accent); background:var(--card); }
+  .tab u { font-style:normal; text-decoration:none; font-weight:500; opacity:.65; margin-left:6px; }
+
   /* ---- toolbar ---- */
-  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:18px 0 14px; }
+  .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 0 14px; }
   input[type=search], select, button, input, textarea {
     font:inherit; color:inherit; border-radius:9px; border:1px solid var(--line);
     background:var(--card); padding:8px 11px; outline:none;
@@ -53,26 +62,32 @@
 
   /* ---- table ---- */
   .tablewrap { background:var(--card); border:1px solid var(--line); border-radius:14px; overflow-x:auto; }
-  table { width:100%; border-collapse:collapse; min-width:1120px; }
+  table { width:100%; border-collapse:collapse; }
   thead th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px;
              color:var(--muted); font-weight:600; padding:11px 10px; border-bottom:1px solid var(--line);
-             position:sticky; top:0; background:var(--card); z-index:2; }
+             position:sticky; top:0; background:var(--card); z-index:2; white-space:nowrap; }
   tbody td { padding:5px 6px; border-bottom:1px solid var(--line); vertical-align:middle; }
   tbody tr:last-child td { border-bottom:0; }
   tbody tr.flash { animation:flash 1.6s ease-out; }
   @keyframes flash { from { background:var(--flash); } to { background:transparent; } }
-  tbody tr.done { opacity:.55; }
+  tbody tr.done { opacity:.5; }
   td input, td textarea, td select { width:100%; border-color:transparent; background:transparent; padding:7px 8px; }
   td input:hover, td textarea:hover, td select:hover { border-color:var(--line); }
   td textarea { resize:vertical; min-height:36px; }
-  .c-date { width:120px; } .c-sku { width:110px; } .c-qty { width:66px; }
-  .c-sup { width:130px; } .c-status { width:140px; } .c-track { width:200px; }
-  .c-carrier { width:110px; } .c-days { width:56px; text-align:center; }
+  .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
+
+  /* stulpelių pločiai */
+  .c-order_date { width:118px; } .c-sku { width:104px; } .c-qty { width:82px; }
+  .c-supplier { width:130px; } .c-status { width:142px; } .c-tracking { width:186px; }
+  .c-carrier { width:108px; } .c-days { width:56px; text-align:center; }
+  .c-font { width:118px; } .c-country { width:112px; } .c-delivered { width:96px; }
   .c-del { width:40px; }
+  .c-graving textarea { min-width:150px; }
+  .c-address textarea { min-width:230px; min-height:52px; }
+
   td.c-days span { font-size:12px; color:var(--muted); }
   td.c-days span.late { color:#fff; background:var(--s-problem); font-weight:600;
                         border-radius:20px; padding:2px 8px; }
-  .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
   select.st { font-weight:600; font-size:13px; border-radius:20px; }
   select.st[data-v=ordered]     { color:var(--s-ordered); }
   select.st[data-v=production]  { color:var(--s-production); }
@@ -80,30 +95,74 @@
   select.st[data-v=shipped]     { color:var(--s-shipped); }
   select.st[data-v=received]    { color:var(--s-received); }
   select.st[data-v=problem]     { color:var(--s-problem); }
+
+  /* delivered jungiklis */
+  .sw { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .sw input { position:absolute; opacity:0; width:0; height:0; }
+  .sw i { width:38px; height:22px; border-radius:20px; background:var(--line); position:relative;
+          transition:background .15s; flex:none; }
+  .sw i::after { content:""; position:absolute; top:3px; left:3px; width:16px; height:16px;
+                 border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25);
+                 transition:transform .15s; }
+  .sw input:checked + i { background:var(--s-received); }
+  .sw input:checked + i::after { transform:translateX(16px); }
+  .sw input:focus-visible + i { box-shadow:0 0 0 3px var(--accent-soft); }
+  .sw b { font-size:12px; font-weight:600; color:var(--muted); }
+  .sw input:checked ~ b { color:var(--s-received); }
+
   .del { border:0; background:transparent; color:var(--muted); font-size:17px; line-height:1; padding:6px; }
   .del:hover { color:var(--s-problem); }
   .empty { padding:44px 20px; text-align:center; color:var(--muted); }
 
+  /* ---- statistika ---- */
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px;
+           padding:14px 18px 16px; margin-bottom:14px; }
+  .panel-h { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .panel-h strong { font-size:14px; }
+  .panel-h .spacer { flex:1; }
+  .panel select, .panel input[type=date] { padding:6px 9px; font-size:14px; }
+  .big { display:flex; gap:34px; margin:14px 0 4px; }
+  .big div b { display:block; font-size:30px; line-height:1.05; font-variant-numeric:tabular-nums; }
+  .big div span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
+  .mini { width:100%; border-collapse:collapse; margin-top:12px; }
+  .mini th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px;
+             color:var(--muted); font-weight:600; padding:4px 8px 6px; border-bottom:1px solid var(--line); }
+  .mini td { padding:5px 8px; font-size:14px; border-bottom:1px solid var(--line); }
+  .mini tr:last-child td { border-bottom:0; }
+  .mini td:first-child { color:var(--muted); white-space:nowrap; width:118px; }
+  .mini td.n { text-align:right; font-variant-numeric:tabular-nums; width:80px; }
+  .mini .bar-cell { width:auto; padding-right:20px; }
+  .mini .bar-fill { height:8px; border-radius:6px; background:var(--accent); min-width:2px; }
+  .link-btn { border:0; background:transparent; color:var(--accent); font-size:13px;
+              font-weight:600; padding:4px 2px; }
+
   /* ---- mobile cards ---- */
-  @media (max-width:820px) {
+  @media (max-width:900px) {
     body { padding:16px 10px 90px; }
     .bar { gap:8px; }
+    .tabs { overflow-x:auto; }
+    .tab { white-space:nowrap; font-size:14px; padding:10px 12px; }
     input[type=search] { flex:1 1 100%; max-width:none; min-width:0; order:-1; }
+    /* kortelėmis virsta TIK pagrindinė lenta — statistikos lentelė lieka lentele */
     .tablewrap { border:0; background:transparent; overflow:visible; }
-    table, thead, tbody, tr, td { display:block; width:auto; min-width:0; }
-    thead { display:none; }
-    tbody tr { background:var(--card); border:1px solid var(--line); border-radius:14px;
+    .tablewrap table, .tablewrap thead, .tablewrap tbody,
+    .tablewrap tr, .tablewrap td { display:block; width:auto; min-width:0; }
+    .tablewrap thead { display:none; }
+    .tablewrap tbody tr { background:var(--card); border:1px solid var(--line); border-radius:14px;
                margin-bottom:12px; padding:6px 12px 10px; }
     /* stulpelių pločiai galioja tik lentelėje — kortelėse viską atstatom */
-    tbody td, tbody td.c-date, tbody td.c-sku, tbody td.c-qty, tbody td.c-sup,
-    tbody td.c-status, tbody td.c-track, tbody td.c-carrier, tbody td.c-days, tbody td.c-del {
-      width:auto; text-align:left; border:0; padding:5px 0;
-      display:flex; align-items:center; gap:10px;
-    }
-    tbody td::before { content:attr(data-l); flex:0 0 82px; font-size:11px; text-transform:uppercase;
+    .tablewrap tbody td[class] { width:auto; text-align:left; border:0; padding:5px 0;
+                      display:flex; align-items:center; gap:10px; }
+    .tablewrap tbody td::before { content:attr(data-l); flex:0 0 92px; font-size:11px; text-transform:uppercase;
                        letter-spacing:.5px; color:var(--muted); font-weight:600; }
-    td input, td textarea, td select { flex:1 1 auto; width:auto; min-width:0; border-color:var(--line); }
-    td input[type=date] { flex:0 0 auto; }
+    .tablewrap td input, .tablewrap td textarea, .tablewrap td select {
+                       flex:1 1 auto; width:auto; min-width:0; border-color:var(--line); }
+    .tablewrap td input[type=date] { flex:0 0 auto; }
+    .panel { padding:12px 14px 14px; }
+    .big { gap:22px; }
+    .mini td:first-child { width:96px; font-size:13px; }
+    .mini td.n { width:56px; }
+    .c-graving textarea, .c-address textarea { min-width:0; }
     .c-del { justify-content:flex-end; }
     .c-del::before { content:""; flex:1; }
     .del { font-size:20px; padding:8px 10px; }
@@ -119,42 +178,51 @@
       <h1>China Orders</h1>
       <div class="sub"><span class="pulse" id="pulse"></span><span id="syncmsg">connecting…</span></div>
     </div>
-    <div class="stats">
-      <div class="stat"><b id="k-open">0</b><span>Open</span></div>
-      <div class="stat"><b id="k-prod">0</b><span>In production</span></div>
-      <div class="stat"><b id="k-ship">0</b><span>Shipped</span></div>
-      <div class="stat"><b id="k-recv">0</b><span>Received</span></div>
-      <div class="stat"><b id="k-prob">0</b><span>Problems</span></div>
-    </div>
+    <div class="stats" id="stats"></div>
   </div>
+
+  <div class="tabs" id="tabs"></div>
 
   <div class="bar">
     <button class="btn-main" id="add">+ New order</button>
-    <input type="search" id="q" placeholder="Search SKU, product, tracking…">
-    <div class="chips" id="chips">
-      <span class="chip on" data-f="active">Active</span>
-      <span class="chip" data-f="all">All</span>
-      <span class="chip" data-f="shipped">Shipped</span>
-      <span class="chip" data-f="received">Received</span>
-      <span class="chip" data-f="problem">Problems</span>
+    <input type="search" id="q" placeholder="Search…">
+    <div class="chips" id="chips"></div>
+    <button id="statsbtn" hidden>Statistics</button>
+  </div>
+
+  <div class="panel" id="panel" hidden>
+    <div class="panel-h">
+      <strong>Orders completed</strong>
+      <select id="period">
+        <option value="this-week">This week</option>
+        <option value="last-week">Last week</option>
+        <option value="this-month">This month</option>
+        <option value="last-month">Last month</option>
+        <option value="last-30">Last 30 days</option>
+        <option value="all">All time</option>
+        <option value="custom">Choose dates…</option>
+      </select>
+      <input type="date" id="from" hidden>
+      <input type="date" id="to" hidden>
+      <span class="spacer"></span>
+      <button class="link-btn" id="bmode">show months</button>
     </div>
+
+    <div class="big">
+      <div><b id="p-orders">0</b><span>orders</span></div>
+      <div><b id="p-pieces">0</b><span>pieces</span></div>
+      <div><b id="p-open">0</b><span>still to make</span></div>
+    </div>
+
+    <table class="mini">
+      <thead><tr><th id="bhead">Week</th><th></th><th class="n">Orders</th><th class="n">Pieces</th></tr></thead>
+      <tbody id="breakdown"></tbody>
+    </table>
   </div>
 
   <div class="tablewrap">
     <table>
-      <thead><tr>
-        <th class="c-date">Order date</th>
-        <th class="c-sku">SKU</th>
-        <th>Product</th>
-        <th class="c-qty">Qty</th>
-        <th class="c-sup">Supplier</th>
-        <th class="c-status">Status</th>
-        <th class="c-track">Tracking no.</th>
-        <th class="c-carrier">Carrier</th>
-        <th class="c-days">Days</th>
-        <th>Notes</th>
-        <th class="c-del"></th>
-      </tr></thead>
+      <thead><tr id="head"></tr></thead>
       <tbody id="rows"></tbody>
     </table>
     <div class="empty" id="empty" hidden>No orders yet — press “+ New order”.</div>
@@ -181,25 +249,103 @@ function readCfg(name, store) {
 const SUPABASE_URL = readCfg("u", "board_url");
 const SUPABASE_KEY = readCfg("k", "board_key");
 const DEMO = !SUPABASE_URL || !SUPABASE_KEY;
-const TABLE = "orders";
 const POLL_MS = 4000;
 
-const FIELDS = ["order_date","sku","product","qty","supplier","status","tracking","carrier","note"];
+/* ---------------------------------------------------------------
+   Two boards on one page. They hold different work — bulk silver
+   stock coming from the factory, and one-off engraved orders going
+   to a named customer — so they get their own columns and their own
+   table in the database instead of one table with half-empty rows.
+----------------------------------------------------------------*/
 const STATUSES = [
-  ["ordered","Ordered"],
-  ["production","In production"],
-  ["ready","Ready"],
-  ["shipped","Shipped"],
-  ["received","Received"],
-  ["problem","Problem"],
+  ["ordered","Ordered"], ["production","In production"], ["ready","Ready"],
+  ["shipped","Shipped"], ["received","Received"], ["problem","Problem"],
 ];
+const hasTracking = r => !!(r.tracking || "").trim();
 
-let rows = [];            // server truth
-let filter = "active";
+const VIEWS = {
+  silver: {
+    label: "Silver unbranded",
+    table: "orders",
+    search: "Search SKU, product, tracking…",
+    cols: [
+      { key:"order_date", label:"Order date", type:"date", cls:"mono" },
+      { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
+      { key:"product",    label:"Product",    ph:"product name" },
+      { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
+      { key:"supplier",   label:"Supplier",   ph:"factory / 1688" },
+      { key:"status",     label:"Status",     kind:"status" },
+      { key:"tracking",   label:"Tracking no.", cls:"mono", ph:"tracking number" },
+      { key:"carrier",    label:"Carrier",    ph:"carrier" },
+      { key:"days",       label:"Days",       kind:"days" },
+      { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
+    ],
+    blank: () => ({ order_date: today(), sku:"", product:"", qty:null, supplier:"",
+                    status:"ordered", tracking:"", carrier:"", note:"" }),
+    done: r => r.status === "received",
+    stats: [
+      { label:"Open",          fn: r => r.status !== "received" },
+      { label:"In production", fn: r => r.status === "production" },
+      { label:"Shipped",       fn: r => r.status === "shipped" },
+      { label:"Received",      fn: r => r.status === "received" },
+      { label:"Problems",      fn: r => r.status === "problem" },
+    ],
+    filters: [
+      { key:"active",   label:"Active",   fn: r => r.status !== "received" },
+      { key:"all",      label:"All",      fn: () => true },
+      { key:"shipped",  label:"Shipped",  fn: r => r.status === "shipped" },
+      { key:"received", label:"Received", fn: r => r.status === "received" },
+      { key:"problem",  label:"Problems", fn: r => r.status === "problem" },
+    ],
+  },
+
+  personalised: {
+    label: "Personalised",
+    table: "personalised_orders",
+    search: "Search SKU, engraving, address, tracking…",
+    analytics: true,   // how much was finished per week / per month
+    cols: [
+      { key:"order_date", label:"Order date", type:"date", cls:"mono" },
+      { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
+      { key:"font",       label:"Font",       ph:"font name" },
+      { key:"graving",    label:"Graving",    tag:"textarea", ph:"text to engrave" },
+      { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
+      { key:"address",    label:"Address & phone number", tag:"textarea", ph:"full address + phone number" },
+      { key:"country",    label:"Country",    ph:"country" },
+      { key:"tracking",   label:"Tracking code", cls:"mono", ph:"tracking code" },
+      { key:"delivered",  label:"Delivered",  kind:"switch" },
+      { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
+    ],
+    blank: () => ({ order_date: today(), sku:"", font:"", graving:"", qty:null,
+                    address:"", country:"", tracking:"", delivered:false, note:"" }),
+    done: r => !!r.delivered,
+    stats: [
+      { label:"Orders",    fn: () => true },
+      { label:"To make",   fn: r => !r.delivered && !hasTracking(r) },
+      { label:"Shipped",   fn: r => !r.delivered && hasTracking(r) },
+      { label:"Delivered", fn: r => !!r.delivered },
+    ],
+    filters: [
+      { key:"active", label:"Active",    fn: r => !r.delivered },
+      { key:"make",   label:"To make",   fn: r => !r.delivered && !hasTracking(r) },
+      { key:"ship",   label:"Shipped",   fn: r => !r.delivered && hasTracking(r) },
+      { key:"done",   label:"Delivered", fn: r => !!r.delivered },
+      { key:"all",    label:"All",       fn: () => true },
+    ],
+  },
+};
+
+let viewKey = (() => {
+  try { return VIEWS[localStorage.getItem("board_view")] ? localStorage.getItem("board_view") : "silver"; }
+  catch (e) { return "silver"; }
+})();
+let view = VIEWS[viewKey];
+let rows = [];            // server truth for the open tab
+let counts = {};          // tab -> how many rows, for the tab labels
+let filter = view.filters[0].key;
 let query = "";
-let editing = null;       // id:field currently focused — never overwrite it from a poll
+let editing = null;       // id:field currently focused — never overwritten by a poll
 let pending = new Map();  // id -> {field:value} not yet confirmed by the server
-let lastSync = 0;
 
 /* ---------------- storage layer ---------------- */
 const api = {
@@ -210,30 +356,34 @@ const api = {
       "Content-Type": "application/json",
     }, extra || {});
   },
-  async list() {
-    if (DEMO) return JSON.parse(localStorage.getItem("demo_orders") || "[]");
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=order_date.desc,created_at.desc`,
+  demoKey(table) { return "demo_" + table; },
+  async list(table) {
+    if (DEMO) return JSON.parse(localStorage.getItem(api.demoKey(table)) || "[]");
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=order_date.desc,created_at.desc`,
                           { headers: api.headers(), cache: "no-store" });
     if (!r.ok) throw new Error("load " + r.status);
     return r.json();
   },
-  async insert(row) {
-    if (DEMO) { const a = await api.list(); a.unshift(row); localStorage.setItem("demo_orders", JSON.stringify(a)); return row; }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+  async insert(table, row) {
+    if (DEMO) { const a = await api.list(table); a.unshift(row);
+                localStorage.setItem(api.demoKey(table), JSON.stringify(a)); return row; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: "POST", headers: api.headers({ "Prefer": "return=representation" }), body: JSON.stringify(row) });
     if (!r.ok) throw new Error("insert " + r.status);
     return (await r.json())[0];
   },
-  async patch(id, patch) {
-    if (DEMO) { const a = await api.list(); const i = a.findIndex(x => x.id === id);
-                if (i > -1) Object.assign(a[i], patch); localStorage.setItem("demo_orders", JSON.stringify(a)); return; }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
+  async patch(table, id, patch) {
+    if (DEMO) { const a = await api.list(table); const i = a.findIndex(x => x.id === id);
+                if (i > -1) Object.assign(a[i], patch);
+                localStorage.setItem(api.demoKey(table), JSON.stringify(a)); return; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
       method: "PATCH", headers: api.headers({ "Prefer": "return=minimal" }), body: JSON.stringify(patch) });
     if (!r.ok) throw new Error("save " + r.status);
   },
-  async remove(id) {
-    if (DEMO) { const a = (await api.list()).filter(x => x.id !== id); localStorage.setItem("demo_orders", JSON.stringify(a)); return; }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
+  async remove(table, id) {
+    if (DEMO) { const a = (await api.list(table)).filter(x => x.id !== id);
+                localStorage.setItem(api.demoKey(table), JSON.stringify(a)); return; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE", headers: api.headers({ "Prefer": "return=minimal" }) });
     if (!r.ok) throw new Error("delete " + r.status);
   },
@@ -241,7 +391,7 @@ const api = {
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
-const today = () => new Date().toISOString().slice(0, 10);
+function today() { return new Date().toISOString().slice(0, 10); }
 function uuid() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -257,30 +407,123 @@ function setSync(state, msg) {
   $("#syncmsg").textContent = msg;
 }
 
-/* ---------------- rendering ---------------- */
+/* ---------------- chrome (tabs, head, filters, stats) ---------------- */
+function renderTabs() {
+  const box = $("#tabs");
+  box.innerHTML = "";
+  for (const [key, v] of Object.entries(VIEWS)) {
+    const b = document.createElement("button");
+    b.className = "tab" + (key === viewKey ? " on" : "");
+    b.textContent = v.label;
+    if (counts[key] != null) {
+      const u = document.createElement("u");
+      u.textContent = counts[key];
+      b.appendChild(u);
+    }
+    b.addEventListener("click", () => switchView(key));
+    box.appendChild(b);
+  }
+}
+
+function renderHead() {
+  const tr = $("#head");
+  tr.innerHTML = "";
+  for (const c of view.cols) {
+    const th = document.createElement("th");
+    th.className = "c-" + c.key;
+    th.textContent = c.label;
+    tr.appendChild(th);
+  }
+  const th = document.createElement("th");
+  th.className = "c-del";
+  tr.appendChild(th);
+}
+
+function renderChips() {
+  const box = $("#chips");
+  box.innerHTML = "";
+  for (const f of view.filters) {
+    const s = document.createElement("span");
+    s.className = "chip" + (f.key === filter ? " on" : "");
+    s.textContent = f.label;
+    s.addEventListener("click", () => { filter = f.key; renderChips(); render(); });
+    box.appendChild(s);
+  }
+}
+
+function renderStats() {
+  const box = $("#stats");
+  box.innerHTML = "";
+  for (const s of view.stats) {
+    const d = document.createElement("div");
+    d.className = "stat";
+    const b = document.createElement("b");
+    b.textContent = rows.filter(s.fn).length;
+    const sp = document.createElement("span");
+    sp.textContent = s.label;
+    d.appendChild(b); d.appendChild(sp);
+    box.appendChild(d);
+  }
+}
+
+/* ---------------- rows ---------------- */
 function visible() {
   const q = query.trim().toLowerCase();
+  const f = view.filters.find(x => x.key === filter) || view.filters[0];
+  const keys = view.cols.map(c => c.key).filter(k => k !== "days");
   return rows.filter(r => {
-    if (filter === "active"   && (r.status === "received")) return false;
-    if (filter === "shipped"  && r.status !== "shipped")  return false;
-    if (filter === "received" && r.status !== "received") return false;
-    if (filter === "problem"  && r.status !== "problem")  return false;
+    if (!f.fn(r)) return false;
     if (!q) return true;
-    return FIELDS.some(f => String(r[f] || "").toLowerCase().includes(q));
+    return keys.some(k => String(r[k] == null ? "" : r[k]).toLowerCase().includes(q));
   });
 }
 
-function cellInput(r, field, opts) {
-  opts = opts || {};
-  const el = document.createElement(opts.tag || "input");
-  if (opts.type) el.type = opts.type;
-  if (opts.cls) el.className = opts.cls;
-  if (opts.ph) el.placeholder = opts.ph;
-  el.value = r[field] == null ? "" : r[field];
-  el.addEventListener("focus", () => { editing = r.id + ":" + field; });
-  el.addEventListener("blur",  () => { if (editing === r.id + ":" + field) editing = null; });
-  el.addEventListener("change", () => save(r.id, field, opts.num ? (el.value === "" ? null : Number(el.value)) : el.value));
+function cellInput(r, col) {
+  const el = document.createElement(col.tag || "input");
+  if (col.type) el.type = col.type;
+  if (col.cls) el.className = col.cls;
+  if (col.ph) el.placeholder = col.ph;
+  el.value = r[col.key] == null ? "" : r[col.key];
+  el.addEventListener("focus", () => { editing = r.id + ":" + col.key; });
+  el.addEventListener("blur",  () => { if (editing === r.id + ":" + col.key) editing = null; });
+  el.addEventListener("change", () =>
+    save(r.id, col.key, col.num ? (el.value === "" ? null : Number(el.value)) : el.value));
   return el;
+}
+
+function statusCell(r) {
+  const sel = document.createElement("select");
+  sel.className = "st";
+  for (const [v, label] of STATUSES) {
+    const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o);
+  }
+  sel.value = r.status || "ordered";
+  sel.dataset.v = sel.value;
+  sel.addEventListener("focus", () => { editing = r.id + ":status"; });
+  sel.addEventListener("blur",  () => { if (editing === r.id + ":status") editing = null; });
+  sel.addEventListener("change", () => { sel.dataset.v = sel.value; save(r.id, "status", sel.value); });
+  return sel;
+}
+
+function switchCell(r, key) {
+  const sw = document.createElement("label");
+  sw.className = "sw";
+  const cb = document.createElement("input");
+  cb.type = "checkbox"; cb.checked = !!r[key];
+  const knob = document.createElement("i");
+  const lab = document.createElement("b");
+  lab.textContent = r[key] ? "yes" : "no";
+  cb.addEventListener("change", () => { lab.textContent = cb.checked ? "yes" : "no"; save(r.id, key, cb.checked); });
+  sw.appendChild(cb); sw.appendChild(knob); sw.appendChild(lab);
+  return sw;
+}
+
+function daysCell(r) {
+  const span = document.createElement("span");
+  const n = daysSince(r.order_date);
+  span.textContent = (view.done(r) || n === "") ? "—" : n + "d";
+  if (n !== "" && n > 30 && !view.done(r)) span.className = "late";
+  return span;
 }
 
 function render() {
@@ -292,61 +535,31 @@ function render() {
   for (const r of list) {
     const tr = document.createElement("tr");
     tr.dataset.id = r.id;
-    if (r.status === "received") tr.classList.add("done");
+    if (view.done(r)) tr.classList.add("done");
 
-    const td = (cls, label, child) => {
-      const c = document.createElement("td");
-      c.className = cls; c.dataset.l = label;
-      if (child) c.appendChild(child);
-      return c;
-    };
-
-    tr.appendChild(td("c-date", "Date", cellInput(r, "order_date", { type: "date", cls: "mono" })));
-    tr.appendChild(td("c-sku", "SKU", cellInput(r, "sku", { cls: "mono", ph: "KTE092" })));
-    tr.appendChild(td("", "Product", cellInput(r, "product", { ph: "product name" })));
-    tr.appendChild(td("c-qty", "Qty", cellInput(r, "qty", { type: "number", cls: "mono", num: true })));
-    tr.appendChild(td("c-sup", "Supplier", cellInput(r, "supplier", { ph: "factory / 1688" })));
-
-    const sel = document.createElement("select");
-    sel.className = "st";
-    for (const [v, label] of STATUSES) {
-      const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o);
+    for (const col of view.cols) {
+      const td = document.createElement("td");
+      td.className = "c-" + col.key;
+      td.dataset.l = col.label;
+      if (col.kind === "status")      td.appendChild(statusCell(r));
+      else if (col.kind === "switch") td.appendChild(switchCell(r, col.key));
+      else if (col.kind === "days")   td.appendChild(daysCell(r));
+      else                            td.appendChild(cellInput(r, col));
+      tr.appendChild(td);
     }
-    sel.value = r.status || "ordered";
-    sel.dataset.v = sel.value;
-    sel.addEventListener("focus", () => { editing = r.id + ":status"; });
-    sel.addEventListener("blur",  () => { if (editing === r.id + ":status") editing = null; });
-    sel.addEventListener("change", () => { sel.dataset.v = sel.value; save(r.id, "status", sel.value); });
-    tr.appendChild(td("c-status", "Status", sel));
 
-    tr.appendChild(td("c-track", "Tracking", cellInput(r, "tracking", { cls: "mono", ph: "tracking number" })));
-    tr.appendChild(td("c-carrier", "Carrier", cellInput(r, "carrier", { ph: "carrier" })));
-
-    const days = document.createElement("span");
-    const n = daysSince(r.order_date);
-    days.textContent = (r.status === "received" || n === "") ? "—" : n + "d";
-    if (n !== "" && n > 30 && r.status !== "received") days.className = "late";
-    tr.appendChild(td("c-days", "Days", days));
-
-    tr.appendChild(td("", "Notes", cellInput(r, "note", { tag: "textarea", ph: "notes" })));
-
+    const tdDel = document.createElement("td");
+    tdDel.className = "c-del"; tdDel.dataset.l = "";
     const del = document.createElement("button");
     del.className = "del"; del.title = "Delete"; del.textContent = "✕";
     del.addEventListener("click", () => removeRow(r));
-    tr.appendChild(td("c-del", "", del));
+    tdDel.appendChild(del);
+    tr.appendChild(tdDel);
 
     tb.appendChild(tr);
   }
   renderStats();
-}
-
-function renderStats() {
-  const c = s => rows.filter(r => r.status === s).length;
-  $("#k-open").textContent = rows.filter(r => !["received"].includes(r.status)).length;
-  $("#k-prod").textContent = c("production");
-  $("#k-ship").textContent = c("shipped");
-  $("#k-recv").textContent = c("received");
-  $("#k-prob").textContent = c("problem");
+  renderPanel();
 }
 
 function flash(id) {
@@ -357,16 +570,31 @@ function flash(id) {
 /* ---------------- writes ---------------- */
 async function save(id, field, value) {
   const row = rows.find(r => r.id === id);
-  if (row) row[field] = value;
+  const patch = { [field]: value };
+
+  // Stamp the day the work was finished the first time it is marked shipped or
+  // delivered — otherwise the weekly numbers would only know when an order came in.
+  if (view.analytics && row && !row.done_date &&
+      ((field === "tracking" && String(value || "").trim()) ||
+       (field === "delivered" && value === true))) {
+    patch.done_date = today();
+  }
+
+  if (row) Object.assign(row, patch);
   const p = pending.get(id) || {};
-  p[field] = value;
+  Object.assign(p, patch);
   pending.set(id, p);
   renderStats();
+  renderPanel();
+  const table = view.table;
   try {
     setSync("busy", "saving…");
-    await api.patch(id, { [field]: value, updated_at: new Date().toISOString() });
+    await api.patch(table, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
     const cur = pending.get(id);
-    if (cur) { delete cur[field]; if (!Object.keys(cur).length) pending.delete(id); }
+    if (cur) {
+      for (const k of Object.keys(patch)) delete cur[k];
+      if (!Object.keys(cur).length) pending.delete(id);
+    }
     setSync("", "saved · live");
   } catch (e) {
     setSync("off", "not saved — check connection, then retype");
@@ -374,29 +602,151 @@ async function save(id, field, value) {
 }
 
 async function addRow() {
-  const row = { id: uuid(), order_date: today(), sku: "", product: "", qty: null,
-                supplier: "", status: "ordered", tracking: "", carrier: "", note: "",
-                created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const row = Object.assign({ id: uuid(), created_at: new Date().toISOString(),
+                              updated_at: new Date().toISOString() }, view.blank());
+  const table = view.table;
   rows.unshift(row);
   render();
   const first = document.querySelector(`tr[data-id="${row.id}"] .c-sku input`);
   if (first) first.focus();
-  try { await api.insert(row); setSync("", "saved · live"); }
+  try { await api.insert(table, row); setSync("", "saved · live"); }
   catch (e) { setSync("off", "could not create the row — reload the page"); }
 }
 
 async function removeRow(r) {
-  const what = r.sku || r.product || "this order";
+  const what = r.sku || r.graving || r.product || "this order";
   if (!confirm(`Delete ${what}?`)) return;
+  const table = view.table;
   rows = rows.filter(x => x.id !== r.id);
   render();
-  try { await api.remove(r.id); } catch (e) { setSync("off", "delete failed — reload the page"); }
+  try { await api.remove(table, r.id); } catch (e) { setSync("off", "delete failed — reload the page"); }
+}
+
+/* ---------------- statistics ----------------
+   Counts an order in the week it was finished (done_date), not the week it
+   arrived — that is the number you get paid on and plan capacity with.
+   Orders finished before this column existed simply fall back to their order date.
+------------------------------------------------*/
+let period = "this-week";
+let breakdownMode = "weeks";
+let panelOpen = (() => { try { return localStorage.getItem("board_stats") !== "0"; } catch (e) { return true; } })();
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+function parseDay(s) { return s ? new Date(String(s).slice(0, 10) + "T00:00:00") : null; }
+function startOfWeek(d) {                       // Monday
+  const x = new Date(d); x.setHours(0,0,0,0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function weekLabel(mon) {
+  const sun = addDays(mon, 6);
+  const a = `${MONTHS[mon.getMonth()]} ${mon.getDate()}`;
+  const b = mon.getMonth() === sun.getMonth() ? `${sun.getDate()}` : `${MONTHS[sun.getMonth()]} ${sun.getDate()}`;
+  return `${a}–${b}`;
+}
+const doneDay = r => r.done_date || ((r.delivered || hasTracking(r)) ? r.order_date : null);
+
+function periodRange() {
+  const now = new Date(); now.setHours(0,0,0,0);
+  if (period === "this-week")  { const m = startOfWeek(now); return [m, addDays(m, 6)]; }
+  if (period === "last-week")  { const m = addDays(startOfWeek(now), -7); return [m, addDays(m, 6)]; }
+  if (period === "this-month") { return [new Date(now.getFullYear(), now.getMonth(), 1),
+                                         new Date(now.getFullYear(), now.getMonth() + 1, 0)]; }
+  if (period === "last-month") { return [new Date(now.getFullYear(), now.getMonth() - 1, 1),
+                                         new Date(now.getFullYear(), now.getMonth(), 0)]; }
+  if (period === "last-30")    { return [addDays(now, -29), now]; }
+  if (period === "custom") {
+    const f = parseDay($("#from").value), t = parseDay($("#to").value);
+    return [f || new Date(2000, 0, 1), t || now];
+  }
+  return [new Date(2000, 0, 1), new Date(2999, 0, 1)];
+}
+
+const pieces = list => list.reduce((s, r) => s + (Number(r.qty) > 0 ? Number(r.qty) : 1), 0);
+
+function renderPanel() {
+  const show = !!view.analytics;
+  $("#statsbtn").hidden = !show;
+  $("#panel").hidden = !(show && panelOpen);
+  if (!show || !panelOpen) return;
+
+  $("#statsbtn").textContent = "Hide statistics";
+  const custom = period === "custom";
+  $("#from").hidden = !custom;
+  $("#to").hidden = !custom;
+
+  const [from, to] = periodRange();
+  const inRange = rows.filter(r => {
+    const d = parseDay(doneDay(r));
+    return d && d >= from && d <= to;
+  });
+
+  $("#p-orders").textContent = inRange.length;
+  $("#p-pieces").textContent = pieces(inRange);
+  $("#p-open").textContent   = rows.filter(r => !r.delivered && !hasTracking(r)).length;
+
+  // breakdown: last 8 weeks or last 6 months
+  const now = new Date(); now.setHours(0,0,0,0);
+  const buckets = [];
+  if (breakdownMode === "weeks") {
+    let m = startOfWeek(now);
+    for (let i = 0; i < 8; i++) { buckets.push({ label: weekLabel(m), from: m, to: addDays(m, 6) }); m = addDays(m, -7); }
+  } else {
+    for (let i = 0; i < 6; i++) {
+      const f = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({ label: `${MONTHS[f.getMonth()]} ${f.getFullYear()}`,
+                     from: f, to: new Date(f.getFullYear(), f.getMonth() + 1, 0) });
+    }
+  }
+  for (const b of buckets) {
+    b.list = rows.filter(r => { const d = parseDay(doneDay(r)); return d && d >= b.from && d <= b.to; });
+  }
+  const max = Math.max(1, ...buckets.map(b => b.list.length));
+
+  const tb = $("#breakdown");
+  tb.innerHTML = "";
+  for (const b of buckets) {
+    const tr = document.createElement("tr");
+    const c1 = document.createElement("td"); c1.textContent = b.label;
+    const c2 = document.createElement("td"); c2.className = "bar-cell";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.width = Math.round((b.list.length / max) * 100) + "%";
+    if (!b.list.length) fill.style.opacity = ".25";
+    c2.appendChild(fill);
+    const c3 = document.createElement("td"); c3.className = "n"; c3.textContent = b.list.length;
+    const c4 = document.createElement("td"); c4.className = "n"; c4.textContent = pieces(b.list);
+    tr.append(c1, c2, c3, c4);
+    tb.appendChild(tr);
+  }
+  $("#bhead").textContent = breakdownMode === "weeks" ? "Week" : "Month";
+  $("#bmode").textContent = breakdownMode === "weeks" ? "show months" : "show weeks";
+}
+
+/* ---------------- view switching ---------------- */
+function switchView(key) {
+  if (key === viewKey || !VIEWS[key]) return;
+  viewKey = key;
+  view = VIEWS[key];
+  try { localStorage.setItem("board_view", key); } catch (e) {}
+  rows = [];
+  pending = new Map();
+  editing = null;
+  filter = view.filters[0].key;
+  $("#q").placeholder = view.search;
+  renderTabs(); renderHead(); renderChips(); render();
+  setSync("busy", "loading…");
+  sync();
 }
 
 /* ---------------- polling ---------------- */
 async function sync() {
+  const table = view.table;
   try {
-    const fresh = await api.list();
+    const fresh = await api.list(table);
+    if (table !== view.table) return;     // tab switched mid-request
     const before = new Map(rows.map(r => [r.id, JSON.stringify(r)]));
 
     // keep local edits that the server hasn't confirmed yet
@@ -412,31 +762,63 @@ async function sync() {
     const sameCount = fresh.length === rows.length;
 
     rows = fresh;
+    counts[viewKey] = fresh.length;
     // re-rendering steals focus, so skip it while someone is typing in a cell
     if (!editing) {
       render();
+      renderTabs();
       if (before.size) [...changed, ...added].forEach(flash);
     } else if (!sameCount || changed.length) {
       renderStats();
     }
-    lastSync = Date.now();
     if (!editing) setSync("", DEMO ? "demo mode — not connected to the shared board" : "live · synced");
   } catch (e) {
     setSync("off", "offline — retrying");
   }
 }
 
+// the other tab's counter, so the label is honest without opening it
+async function syncCounts() {
+  for (const [key, v] of Object.entries(VIEWS)) {
+    if (key === viewKey) continue;
+    try { counts[key] = (await api.list(v.table)).length; } catch (e) {}
+  }
+  if (!editing) renderTabs();
+}
+
 /* ---------------- wire up ---------------- */
 $("#add").addEventListener("click", addRow);
 $("#q").addEventListener("input", e => { query = e.target.value; if (!editing) render(); });
-document.querySelectorAll(".chip").forEach(ch => ch.addEventListener("click", () => {
-  document.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
-  ch.classList.add("on"); filter = ch.dataset.f; render();
-}));
 document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
 
+$("#period").addEventListener("change", e => {
+  period = e.target.value;
+  if (period === "custom" && !$("#from").value) {
+    const now = new Date();
+    $("#from").value = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+    $("#to").value = iso(now);
+  }
+  renderPanel();
+});
+$("#from").addEventListener("change", renderPanel);
+$("#to").addEventListener("change", renderPanel);
+$("#bmode").addEventListener("click", () => {
+  breakdownMode = breakdownMode === "weeks" ? "months" : "weeks";
+  renderPanel();
+});
+$("#statsbtn").addEventListener("click", () => {
+  panelOpen = !panelOpen;
+  try { localStorage.setItem("board_stats", panelOpen ? "1" : "0"); } catch (e) {}
+  $("#statsbtn").textContent = panelOpen ? "Hide statistics" : "Statistics";
+  renderPanel();
+});
+
+$("#q").placeholder = view.search;
+renderTabs(); renderHead(); renderChips(); render();
 sync();
+syncCounts();
 setInterval(sync, POLL_MS);
+setInterval(syncCounts, POLL_MS * 5);
 </script>
 </body>
 </html>
