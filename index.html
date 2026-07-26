@@ -267,20 +267,18 @@ const VIEWS = {
   silver: {
     label: "Silver unbranded",
     table: "orders",
-    search: "Search SKU, product, tracking…",
+    search: "Search SKU, tracking…",
     cols: [
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
-      { key:"product",    label:"Product",    ph:"product name" },
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
-      { key:"supplier",   label:"Supplier",   ph:"factory / 1688" },
       { key:"status",     label:"Status",     kind:"status" },
       { key:"tracking",   label:"Tracking no.", cls:"mono", ph:"tracking number" },
       { key:"carrier",    label:"Carrier",    ph:"carrier" },
       { key:"days",       label:"Days",       kind:"days" },
       { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
     ],
-    blank: () => ({ order_date: today(), sku:"", product:"", qty:null, supplier:"",
+    blank: () => ({ order_date: today(), sku:"", qty:null,
                     status:"ordered", tracking:"", carrier:"", note:"" }),
     done: r => r.status === "received",
     stats: [
