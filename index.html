@@ -252,10 +252,17 @@ const DEMO = !SUPABASE_URL || !SUPABASE_KEY;
 const POLL_MS = 4000;
 
 /* ---------------------------------------------------------------
-   Two boards on one page. They hold different work — bulk silver
-   stock coming from the factory, and one-off engraved orders going
-   to a named customer — so they get their own columns and their own
-   table in the database instead of one table with half-empty rows.
+   Four boards on one page, holding two different kinds of work.
+
+   Silver unbranded, Pandora and Pearl Jewellery are the same job —
+   bulk stock coming from the factory — so they share one table and
+   the same columns, and differ only by which product line the row
+   belongs to. Splitting them into tabs keeps each product line's
+   list short enough to read at a glance.
+
+   Personalised is a different job — one-off engraved orders going to
+   a named customer — so it keeps its own columns and its own table
+   instead of one table with half-empty rows.
 ----------------------------------------------------------------*/
 const STATUSES = [
   ["ordered","Ordered"], ["production","In production"], ["ready","Ready"],
@@ -263,10 +270,13 @@ const STATUSES = [
 ];
 const hasTracking = r => !!(r.tracking || "").trim();
 
-const VIEWS = {
-  silver: {
-    label: "Silver unbranded",
+// One product line of factory stock. `category` is both the tab it shows up in
+// and the value written to every row, so rows can never land in the wrong tab.
+function bulkView(label, category) {
+  return {
+    label,
     table: "orders",
+    category,
     search: "Search SKU, tracking…",
     cols: [
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
@@ -278,7 +288,7 @@ const VIEWS = {
       { key:"days",       label:"Days",       kind:"days" },
       { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
     ],
-    blank: () => ({ order_date: today(), sku:"", qty:null,
+    blank: () => ({ order_date: today(), sku:"", qty:null, category,
                     status:"ordered", tracking:"", carrier:"", note:"" }),
     done: r => r.status === "received",
     stats: [
@@ -295,7 +305,13 @@ const VIEWS = {
       { key:"received", label:"Received", fn: r => r.status === "received" },
       { key:"problem",  label:"Problems", fn: r => r.status === "problem" },
     ],
-  },
+  };
+}
+
+const VIEWS = {
+  silver:  bulkView("Silver unbranded", "silver"),
+  pandora: bulkView("Pandora",          "pandora"),
+  pearl:   bulkView("Pearl Jewellery",  "pearl"),
 
   personalised: {
     label: "Personalised",
@@ -354,34 +370,38 @@ const api = {
       "Content-Type": "application/json",
     }, extra || {});
   },
-  demoKey(table) { return "demo_" + table; },
-  async list(table) {
-    if (DEMO) return JSON.parse(localStorage.getItem(api.demoKey(table)) || "[]");
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=order_date.desc,created_at.desc`,
+  // Every call takes the whole view (table + product line), because three tabs
+  // now live in the same table and must never see each other's rows.
+  demoKey(v) { return "demo_" + v.table + (v.category ? "_" + v.category : ""); },
+  where(v) { return v.category ? `&category=eq.${encodeURIComponent(v.category)}` : ""; },
+  async list(v) {
+    if (DEMO) return JSON.parse(localStorage.getItem(api.demoKey(v)) || "[]");
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${v.table}?select=*${api.where(v)}` +
+                          `&order=order_date.desc,created_at.desc`,
                           { headers: api.headers(), cache: "no-store" });
     if (!r.ok) throw new Error("load " + r.status);
     return r.json();
   },
-  async insert(table, row) {
-    if (DEMO) { const a = await api.list(table); a.unshift(row);
-                localStorage.setItem(api.demoKey(table), JSON.stringify(a)); return row; }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  async insert(v, row) {
+    if (DEMO) { const a = await api.list(v); a.unshift(row);
+                localStorage.setItem(api.demoKey(v), JSON.stringify(a)); return row; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${v.table}`, {
       method: "POST", headers: api.headers({ "Prefer": "return=representation" }), body: JSON.stringify(row) });
     if (!r.ok) throw new Error("insert " + r.status);
     return (await r.json())[0];
   },
-  async patch(table, id, patch) {
-    if (DEMO) { const a = await api.list(table); const i = a.findIndex(x => x.id === id);
+  async patch(v, id, patch) {
+    if (DEMO) { const a = await api.list(v); const i = a.findIndex(x => x.id === id);
                 if (i > -1) Object.assign(a[i], patch);
-                localStorage.setItem(api.demoKey(table), JSON.stringify(a)); return; }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+                localStorage.setItem(api.demoKey(v), JSON.stringify(a)); return; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${v.table}?id=eq.${encodeURIComponent(id)}`, {
       method: "PATCH", headers: api.headers({ "Prefer": "return=minimal" }), body: JSON.stringify(patch) });
     if (!r.ok) throw new Error("save " + r.status);
   },
-  async remove(table, id) {
-    if (DEMO) { const a = (await api.list(table)).filter(x => x.id !== id);
-                localStorage.setItem(api.demoKey(table), JSON.stringify(a)); return; }
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+  async remove(v, id) {
+    if (DEMO) { const a = (await api.list(v)).filter(x => x.id !== id);
+                localStorage.setItem(api.demoKey(v), JSON.stringify(a)); return; }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${v.table}?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE", headers: api.headers({ "Prefer": "return=minimal" }) });
     if (!r.ok) throw new Error("delete " + r.status);
   },
@@ -584,10 +604,10 @@ async function save(id, field, value) {
   pending.set(id, p);
   renderStats();
   renderPanel();
-  const table = view.table;
+  const v = view;                       // remember the tab the edit belongs to
   try {
     setSync("busy", "saving…");
-    await api.patch(table, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
+    await api.patch(v, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
     const cur = pending.get(id);
     if (cur) {
       for (const k of Object.keys(patch)) delete cur[k];
@@ -602,22 +622,22 @@ async function save(id, field, value) {
 async function addRow() {
   const row = Object.assign({ id: uuid(), created_at: new Date().toISOString(),
                               updated_at: new Date().toISOString() }, view.blank());
-  const table = view.table;
+  const v = view;
   rows.unshift(row);
   render();
   const first = document.querySelector(`tr[data-id="${row.id}"] .c-sku input`);
   if (first) first.focus();
-  try { await api.insert(table, row); setSync("", "saved · live"); }
+  try { await api.insert(v, row); setSync("", "saved · live"); }
   catch (e) { setSync("off", "could not create the row — reload the page"); }
 }
 
 async function removeRow(r) {
   const what = r.sku || r.graving || r.product || "this order";
   if (!confirm(`Delete ${what}?`)) return;
-  const table = view.table;
+  const v = view;
   rows = rows.filter(x => x.id !== r.id);
   render();
-  try { await api.remove(table, r.id); } catch (e) { setSync("off", "delete failed — reload the page"); }
+  try { await api.remove(v, r.id); } catch (e) { setSync("off", "delete failed — reload the page"); }
 }
 
 /* ---------------- statistics ----------------
@@ -741,10 +761,10 @@ function switchView(key) {
 
 /* ---------------- polling ---------------- */
 async function sync() {
-  const table = view.table;
+  const v = view;
   try {
-    const fresh = await api.list(table);
-    if (table !== view.table) return;     // tab switched mid-request
+    const fresh = await api.list(v);
+    if (v !== view) return;               // tab switched mid-request
     const before = new Map(rows.map(r => [r.id, JSON.stringify(r)]));
 
     // keep local edits that the server hasn't confirmed yet
@@ -775,11 +795,11 @@ async function sync() {
   }
 }
 
-// the other tab's counter, so the label is honest without opening it
+// the other tabs' counters, so the labels are honest without opening them
 async function syncCounts() {
   for (const [key, v] of Object.entries(VIEWS)) {
     if (key === viewKey) continue;
-    try { counts[key] = (await api.list(v.table)).length; } catch (e) {}
+    try { counts[key] = (await api.list(v)).length; } catch (e) {}
   }
   if (!editing) renderTabs();
 }
