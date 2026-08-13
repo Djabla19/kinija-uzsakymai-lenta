@@ -76,6 +76,24 @@
   td textarea { resize:vertical; min-height:36px; }
   .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
 
+  /* ---- product photo ----
+     One main photo per SKU, served from public storage. Rows whose SKU has no
+     photo yet must not leave a hole in the table, so the empty slot keeps the
+     same size and just stays grey. */
+  .c-photo { width:60px; }
+  .pic { width:48px; height:48px; border-radius:8px; background:var(--line);
+         overflow:hidden; display:block; border:0; padding:0; cursor:zoom-in; }
+  .pic img { width:100%; height:100%; object-fit:cover; display:block; }
+  .pic.none { cursor:default; opacity:.5; }
+
+  .lb { position:fixed; inset:0; background:rgba(10,13,18,.88); display:none;
+        align-items:center; justify-content:center; padding:24px; z-index:60; cursor:zoom-out; }
+  .lb.on { display:flex; }
+  .lb figure { margin:0; text-align:center; max-width:min(760px,100%); }
+  .lb img { max-width:100%; max-height:76vh; border-radius:14px; background:#fff; display:block; }
+  .lb figcaption { color:#fff; margin-top:12px; font-weight:600;
+                   font-family:ui-monospace,Menlo,Consolas,monospace; }
+
   /* stulpelių pločiai */
   .c-order_date { width:118px; } .c-sku { width:104px; } .c-qty { width:82px; }
   .c-supplier { width:130px; } .c-status { width:142px; } .c-tracking { width:186px; }
@@ -163,6 +181,9 @@
     .mini td:first-child { width:96px; font-size:13px; }
     .mini td.n { width:56px; }
     .c-graving textarea, .c-address textarea { min-width:0; }
+    /* kortelėje nuotrauka stovi viršuje kaip kortelės paveiksliukas */
+    .tablewrap tbody td.c-photo::before { content:""; flex:0 0 92px; }
+    .pic { width:64px; height:64px; }
     .c-del { justify-content:flex-end; }
     .c-del::before { content:""; flex:1; }
     .del { font-size:20px; padding:8px 10px; }
@@ -231,6 +252,8 @@
   <div class="foot">Everything you type saves automatically and appears on the other person’s screen within a few seconds.</div>
 </div>
 
+<div class="lb" id="lb"><figure><img id="lbimg" alt=""><figcaption id="lbcap"></figcaption></figure></div>
+
 <script>
 /* ---------------------------------------------------------------
    Config travels in the link itself (the part after #), not in this
@@ -279,6 +302,7 @@ function bulkView(label, category) {
     category,
     search: "Search SKU, tracking…",
     cols: [
+      { key:"photo",      label:"",           kind:"photo" },
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
@@ -319,6 +343,7 @@ const VIEWS = {
     search: "Search SKU, engraving, address, tracking…",
     analytics: true,   // how much was finished per week / per month
     cols: [
+      { key:"photo",      label:"",           kind:"photo" },
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
       { key:"font",       label:"Font",       ph:"font name" },
@@ -488,7 +513,9 @@ function renderStats() {
 function visible() {
   const q = query.trim().toLowerCase();
   const f = view.filters.find(x => x.key === filter) || view.filters[0];
-  const keys = view.cols.map(c => c.key).filter(k => k !== "days");
+  // `days` and `photo` are drawn, not stored — searching them would compare
+  // against undefined on every row.
+  const keys = view.cols.map(c => c.key).filter(k => k !== "days" && k !== "photo");
   return rows.filter(r => {
     if (!f.fn(r)) return false;
     if (!q) return true;
@@ -536,6 +563,45 @@ function switchCell(r, key) {
   return sw;
 }
 
+/* One main photo per SKU, uploaded by katalogas.py and served straight from
+   public storage. The file name IS the SKU, so no lookup table is needed —
+   a row typed in China shows its photo the moment the code is spelled right.
+   Missing photo is normal (new item, typo), so it fails quietly to grey. */
+function photoUrl(sku, big) {
+  const clean = String(sku || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  if (!clean || !SUPABASE_URL) return "";
+  return `${SUPABASE_URL}/storage/v1/object/public/produktai/${big ? "big/" : ""}${clean}.webp`;
+}
+
+function photoCell(r) {
+  const box = document.createElement("button");
+  box.className = "pic none";
+  box.type = "button";
+  const url = photoUrl(r.sku, false);
+  if (!url) return box;
+
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.decoding = "async";
+  img.alt = r.sku || "";
+  img.addEventListener("load", () => { box.classList.remove("none"); });
+  img.addEventListener("error", () => { img.remove(); });
+  img.src = url;
+  box.appendChild(img);
+  box.addEventListener("click", () => {
+    if (box.classList.contains("none")) return;
+    openPhoto(r.sku);
+  });
+  return box;
+}
+
+function openPhoto(sku) {
+  $("#lbimg").src = photoUrl(sku, true);
+  $("#lbimg").alt = sku || "";
+  $("#lbcap").textContent = sku || "";
+  $("#lb").classList.add("on");
+}
+
 function daysCell(r) {
   const span = document.createElement("span");
   const n = daysSince(r.order_date);
@@ -561,6 +627,7 @@ function render() {
       td.dataset.l = col.label;
       if (col.kind === "status")      td.appendChild(statusCell(r));
       else if (col.kind === "switch") td.appendChild(switchCell(r, col.key));
+      else if (col.kind === "photo")  td.appendChild(photoCell(r));
       else if (col.kind === "days")   td.appendChild(daysCell(r));
       else                            td.appendChild(cellInput(r, col));
       tr.appendChild(td);
@@ -829,6 +896,11 @@ $("#statsbtn").addEventListener("click", () => {
   try { localStorage.setItem("board_stats", panelOpen ? "1" : "0"); } catch (e) {}
   $("#statsbtn").textContent = panelOpen ? "Hide statistics" : "Statistics";
   renderPanel();
+});
+
+$("#lb").addEventListener("click", () => $("#lb").classList.remove("on"));
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") $("#lb").classList.remove("on");
 });
 
 $("#q").placeholder = view.search;
