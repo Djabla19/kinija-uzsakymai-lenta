@@ -577,7 +577,10 @@ function switchCell(r, key) {
 function photoNames(sku) {
   const clean = String(sku || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
   if (!clean) return [];
-  const bazinis = clean.replace(/-?S-?\d+$/, "").replace(/-[A-Z]{1,3}\d?$/, "");
+  // Variantai rašomi labai įvairiai („KTR144 S-8", „KTB005 20CM", „KTC165-A"),
+  // todėl bazinio kodo neatiminėjam, o tiesiog paimam kodo pradžią.
+  const m = clean.match(/^[A-Z]{2,4}\d{2,5}/);
+  const bazinis = m ? m[0] : "";
   return bazinis && bazinis !== clean ? [clean, bazinis] : [clean];
 }
 
