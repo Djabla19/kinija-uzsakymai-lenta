@@ -578,10 +578,18 @@ function photoNames(sku) {
   const clean = String(sku || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
   if (!clean) return [];
   // Variantai rašomi labai įvairiai („KTR144 S-8", „KTB005 20CM", „KTC165-A"),
-  // todėl bazinio kodo neatiminėjam, o tiesiog paimam kodo pradžią.
-  const m = clean.match(/^[A-Z]{2,4}\d{2,5}/);
-  const bazinis = m ? m[0] : "";
-  return bazinis && bazinis !== clean ? [clean, bazinis] : [clean];
+  // ir dydis prilimpa prie kodo skaitmenų (KTB005 + 20CM → KTB00520CM), tad
+  // kur baigiasi kodas, iš vienos eilutės nepasakysi. Todėl siūlom kelis
+  // variantus nuo ilgiausio iki trumpiausio — pirmas rastas ir laimi.
+  const kand = [clean];
+  const m = clean.match(/^([A-Z]{2,4})(\d+)/);
+  if (m) {
+    for (let n = Math.min(m[2].length, 5); n >= 3; n--) {
+      const v = m[1] + m[2].slice(0, n);
+      if (!kand.includes(v)) kand.push(v);
+    }
+  }
+  return kand;
 }
 
 function photoUrl(name, big) {
