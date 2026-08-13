@@ -311,7 +311,9 @@ function bulkView(label, category) {
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
       // Size lives in its own column so the SKU stays a clean code — that is
       // also what the product photo is looked up by.
-      { key:"size",       label:"Size",       cls:"mono", ph:"18CM / S-8" },
+      // Užuomina trumpa ir bendrinė: konkretus pavyzdys („18CM") tuščiuose
+      // langeliuose atrodo kaip įrašyta reikšmė ir klaidina.
+      { key:"size",       label:"Size",       cls:"mono", ph:"size" },
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
       { key:"status",     label:"Status",     kind:"status" },
       { key:"tracking",   label:"Tracking no.", cls:"mono", ph:"tracking number" },
@@ -354,7 +356,7 @@ const VIEWS = {
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
       { key:"font",       label:"Font",       ph:"font name" },
-      { key:"colour",     label:"Colour",     ph:"gold / silver / rose" },
+      { key:"colour",     label:"Colour",     ph:"colour" },
       { key:"graving",    label:"Graving",    tag:"textarea", ph:"text to engrave" },
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
       { key:"address",    label:"Address & phone number", tag:"textarea", ph:"full address + phone number" },
