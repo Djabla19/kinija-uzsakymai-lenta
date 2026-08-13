@@ -81,10 +81,14 @@
      photo yet must not leave a hole in the table, so the empty slot keeps the
      same size and just stays grey. */
   .c-photo { width:60px; }
-  .pic { width:48px; height:48px; border-radius:8px; background:var(--line);
+  .pic { width:48px; height:48px; border-radius:8px; background:var(--card);
          overflow:hidden; display:block; border:0; padding:0; cursor:zoom-in; }
   .pic img { width:100%; height:100%; object-fit:cover; display:block; }
-  .pic.none { cursor:default; opacity:.5; }
+  /* Nėra nuotraukos — paliekam tuščią vietą su vos matomu kontūru. Užpildytas
+     kvadratas tamsioje temoje atrodo kaip juoda dėmė ir traukia akį labiau
+     už pačias prekes. */
+  .pic.none { cursor:default; background:transparent;
+              border:1px dashed var(--line); }
 
   .lb { position:fixed; inset:0; background:rgba(10,13,18,.88); display:none;
         align-items:center; justify-content:center; padding:24px; z-index:60; cursor:zoom-out; }
@@ -567,36 +571,53 @@ function switchCell(r, key) {
    public storage. The file name IS the SKU, so no lookup table is needed —
    a row typed in China shows its photo the moment the code is spelled right.
    Missing photo is normal (new item, typo), so it fails quietly to grey. */
-function photoUrl(sku, big) {
+/* A row may name a variant the catalogue keeps under its base code — a ring
+   size ("KTR144 S-8") or a plating suffix. So we try the exact code first and
+   fall back to the base one, rather than showing an empty box. */
+function photoNames(sku) {
   const clean = String(sku || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
-  if (!clean || !SUPABASE_URL) return "";
-  return `${SUPABASE_URL}/storage/v1/object/public/produktai/${big ? "big/" : ""}${clean}.webp`;
+  if (!clean) return [];
+  const bazinis = clean.replace(/-?S-?\d+$/, "").replace(/-[A-Z]{1,3}\d?$/, "");
+  return bazinis && bazinis !== clean ? [clean, bazinis] : [clean];
+}
+
+function photoUrl(name, big) {
+  if (!name || !SUPABASE_URL) return "";
+  return `${SUPABASE_URL}/storage/v1/object/public/produktai/${big ? "big/" : ""}${name}.webp`;
 }
 
 function photoCell(r) {
   const box = document.createElement("button");
   box.className = "pic none";
   box.type = "button";
-  const url = photoUrl(r.sku, false);
-  if (!url) return box;
+  const vardai = photoNames(r.sku);
+  if (!vardai.length || !SUPABASE_URL) return box;
 
   const img = document.createElement("img");
   img.loading = "lazy";
   img.decoding = "async";
   img.alt = r.sku || "";
-  img.addEventListener("load", () => { box.classList.remove("none"); });
-  img.addEventListener("error", () => { img.remove(); });
-  img.src = url;
+  let bandymas = 0;
+  img.addEventListener("load", () => {
+    box.classList.remove("none");
+    box.dataset.name = vardai[bandymas];
+  });
+  img.addEventListener("error", () => {
+    bandymas += 1;
+    if (bandymas < vardai.length) img.src = photoUrl(vardai[bandymas], false);
+    else img.remove();
+  });
+  img.src = photoUrl(vardai[0], false);
   box.appendChild(img);
   box.addEventListener("click", () => {
     if (box.classList.contains("none")) return;
-    openPhoto(r.sku);
+    openPhoto(box.dataset.name, r.sku);
   });
   return box;
 }
 
-function openPhoto(sku) {
-  $("#lbimg").src = photoUrl(sku, true);
+function openPhoto(name, sku) {
+  $("#lbimg").src = photoUrl(name, true);
   $("#lbimg").alt = sku || "";
   $("#lbcap").textContent = sku || "";
   $("#lb").classList.add("on");
