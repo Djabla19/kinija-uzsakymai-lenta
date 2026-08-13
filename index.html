@@ -102,7 +102,7 @@
   .c-order_date { width:118px; } .c-sku { width:104px; } .c-qty { width:82px; }
   .c-supplier { width:130px; } .c-status { width:142px; } .c-tracking { width:186px; }
   .c-carrier { width:108px; } .c-days { width:56px; text-align:center; }
-  .c-font { width:118px; } .c-country { width:112px; } .c-delivered { width:96px; }
+  .c-size { width:88px; } .c-colour { width:110px; } .c-font { width:118px; } .c-country { width:112px; } .c-delivered { width:96px; }
   .c-del { width:40px; }
   .c-graving textarea { min-width:150px; }
   .c-address textarea { min-width:230px; min-height:52px; }
@@ -309,6 +309,9 @@ function bulkView(label, category) {
       { key:"photo",      label:"",           kind:"photo" },
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
+      // Size lives in its own column so the SKU stays a clean code — that is
+      // also what the product photo is looked up by.
+      { key:"size",       label:"Size",       cls:"mono", ph:"18CM / S-8" },
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
       { key:"status",     label:"Status",     kind:"status" },
       { key:"tracking",   label:"Tracking no.", cls:"mono", ph:"tracking number" },
@@ -316,7 +319,7 @@ function bulkView(label, category) {
       { key:"days",       label:"Days",       kind:"days" },
       { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
     ],
-    blank: () => ({ order_date: today(), sku:"", qty:null, category,
+    blank: () => ({ order_date: today(), sku:"", size:"", qty:null, category,
                     status:"ordered", tracking:"", carrier:"", note:"" }),
     done: r => r.status === "received",
     stats: [
@@ -351,6 +354,7 @@ const VIEWS = {
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
       { key:"sku",        label:"SKU",        cls:"mono", ph:"KTE092" },
       { key:"font",       label:"Font",       ph:"font name" },
+      { key:"colour",     label:"Colour",     ph:"gold / silver / rose" },
       { key:"graving",    label:"Graving",    tag:"textarea", ph:"text to engrave" },
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
       { key:"address",    label:"Address & phone number", tag:"textarea", ph:"full address + phone number" },
@@ -359,7 +363,7 @@ const VIEWS = {
       { key:"delivered",  label:"Delivered",  kind:"switch" },
       { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
     ],
-    blank: () => ({ order_date: today(), sku:"", font:"", graving:"", qty:null,
+    blank: () => ({ order_date: today(), sku:"", font:"", colour:"", graving:"", qty:null,
                     address:"", country:"", tracking:"", delivered:false, note:"" }),
     done: r => !!r.delivered,
     stats: [
@@ -574,21 +578,20 @@ function switchCell(r, key) {
 /* A row may name a variant the catalogue keeps under its base code — a ring
    size ("KTR144 S-8") or a plating suffix. So we try the exact code first and
    fall back to the base one, rather than showing an empty box. */
+/* Where the code ends and the variant begins is written right there: the space.
+   "KTB005 20CM" is item KTB005 in size 20cm, "KTR144 S-8" is KTR144 in size 8.
+   So we split on the space FIRST — stripping it away would glue the size onto
+   the digits (KTB00520CM) and leave nothing to go on. */
 function photoNames(sku) {
-  const clean = String(sku || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
-  if (!clean) return [];
-  // Variantai rašomi labai įvairiai („KTR144 S-8", „KTB005 20CM", „KTC165-A"),
-  // ir dydis prilimpa prie kodo skaitmenų (KTB005 + 20CM → KTB00520CM), tad
-  // kur baigiasi kodas, iš vienos eilutės nepasakysi. Todėl siūlom kelis
-  // variantus nuo ilgiausio iki trumpiausio — pirmas rastas ir laimi.
-  const kand = [clean];
-  const m = clean.match(/^([A-Z]{2,4})(\d+)/);
-  if (m) {
-    for (let n = Math.min(m[2].length, 5); n >= 3; n--) {
-      const v = m[1] + m[2].slice(0, n);
-      if (!kand.includes(v)) kand.push(v);
-    }
+  const raw = String(sku || "").toUpperCase().trim();
+  const svarus = s => s.replace(/[^A-Z0-9-]/g, "");
+  const kand = [];
+  for (const v of [svarus(raw), svarus(raw.split(/\s+/)[0])]) {
+    if (v && !kand.includes(v)) kand.push(v);
   }
+  // Ir tas pats be dangos priesagos gale („KTC165-A" → „KTC165").
+  const be_variantu = (kand[kand.length - 1] || "").replace(/-[A-Z]{1,3}\d?$/, "");
+  if (be_variantu && !kand.includes(be_variantu)) kand.push(be_variantu);
   return kand;
 }
 
