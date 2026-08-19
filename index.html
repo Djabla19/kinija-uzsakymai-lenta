@@ -301,12 +301,15 @@ const hasTracking = r => !!(r.tracking || "").trim();
 
 // One product line of factory stock. `category` is both the tab it shows up in
 // and the value written to every row, so rows can never land in the wrong tab.
-function bulkView(label, category) {
+// `ship` — this product line is sent straight to the buyer, so it also needs
+// colour, address and country, the same way the Personalised tab has them.
+function bulkView(label, category, opts) {
+  const ship = !!(opts && opts.ship);
   return {
     label,
     table: "orders",
     category,
-    search: "Search SKU, tracking…",
+    search: ship ? "Search SKU, tracking, address…" : "Search SKU, tracking…",
     cols: [
       { key:"photo",      label:"",           kind:"photo" },
       { key:"order_date", label:"Order date", type:"date", cls:"mono" },
@@ -316,7 +319,12 @@ function bulkView(label, category) {
       // Užuomina trumpa ir bendrinė: konkretus pavyzdys („18CM") tuščiuose
       // langeliuose atrodo kaip įrašyta reikšmė ir klaidina.
       { key:"size",       label:"Size",       cls:"mono", ph:"size" },
+      ...(ship ? [{ key:"colour", label:"Colour", ph:"colour" }] : []),
       { key:"qty",        label:"Qty",        type:"number", cls:"mono", num:true },
+      ...(ship ? [
+      { key:"address",    label:"Address & phone number", tag:"textarea", ph:"full address + phone number" },
+      { key:"country",    label:"Country",    ph:"country" },
+      ] : []),
       { key:"status",     label:"Status",     kind:"status" },
       { key:"tracking",   label:"Tracking no.", cls:"mono", ph:"tracking number" },
       { key:"carrier",    label:"Carrier",    ph:"carrier" },
@@ -324,7 +332,8 @@ function bulkView(label, category) {
       { key:"note",       label:"Notes",      tag:"textarea", ph:"notes" },
     ],
     blank: () => ({ order_date: today(), sku:"", size:"", qty:null, category,
-                    status:"ordered", tracking:"", carrier:"", note:"" }),
+                    status:"ordered", tracking:"", carrier:"", note:"",
+                    ...(ship ? { colour:"", address:"", country:"" } : {}) }),
     done: r => r.status === "received",
     stats: [
       { label:"Open",          fn: r => r.status !== "received" },
@@ -346,9 +355,9 @@ function bulkView(label, category) {
 const VIEWS = {
   silver:  bulkView("Silver unbranded", "silver"),
   pandora: bulkView("Pandora",          "pandora"),
-  pearl:   bulkView("Pearl Jewellery",  "pearl"),
-  bd:      bulkView("B/D Modian Silver Sterling", "bd"),
-  ac:      bulkView("A/C Modian Silver Sterling", "ac"),
+  pearl:   bulkView("Pearl Jewellery",  "pearl",         { ship:true }),
+  bd:      bulkView("B/D Modian Silver Sterling", "bd",   { ship:true }),
+  ac:      bulkView("A/C Modian Silver Sterling", "ac",   { ship:true }),
 
   personalised: {
     label: "Personalised",
