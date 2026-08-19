@@ -37,8 +37,10 @@
   .stat span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
 
   /* ---- tabs ---- */
-  .tabs { display:flex; gap:4px; margin:22px 0 0; border-bottom:1px solid var(--line); }
+  .tabs { display:flex; gap:4px; margin:22px 0 0; border-bottom:1px solid var(--line);
+          overflow-x:auto; }
   .tab { border:0; background:transparent; color:var(--muted); font-size:15px; font-weight:600;
+         white-space:nowrap;
          padding:10px 16px; border-radius:10px 10px 0 0; border-bottom:2px solid transparent;
          margin-bottom:-1px; cursor:pointer; }
   .tab:hover { color:var(--ink); }
@@ -345,6 +347,8 @@ const VIEWS = {
   silver:  bulkView("Silver unbranded", "silver"),
   pandora: bulkView("Pandora",          "pandora"),
   pearl:   bulkView("Pearl Jewellery",  "pearl"),
+  bd:      bulkView("B/D Modian Silver Sterling", "bd"),
+  ac:      bulkView("A/C Modian Silver Sterling", "ac"),
 
   personalised: {
     label: "Personalised",
