@@ -519,7 +519,10 @@ function stockView() {
     stock: true,
     order: "sku.asc",
     search: "Search SKU…",
-    addLabel: "+ New product",
+    // Named after what the person is doing, not after what the database gets:
+    // in the warehouse this button is reached for when goods arrive that are
+    // not on the list yet, and that is "adding stock", not "creating a product".
+    addLabel: "+ Add stock",
     cols: [
       { key:"photo",   label:"",          kind:"photo" },
       { key:"sku",     label:"SKU",       cls:"mono", ph:"KTE092" },
