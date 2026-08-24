@@ -143,9 +143,10 @@ const EILE = ["charms", "earrings", "necklaces", "bracelets", "rings", "other"];
 /* Stock travels inside this file too — a number and a colour written in at
    publish time, refreshed every night. There is still no database key here:
    the page shows what it was given and can reach nothing else. */
-const STOCK_LABELS = {
-  g: "in stock", o: "low stock", r: "out of stock", n: "",
-};
+/* Red means "will not last", which is not the same as "there are none" — a
+   product selling twenty a day is red at 100 pieces. So the number is always
+   shown; only a real zero says out of stock. */
+const STOCK_LABELS = { g: "in stock", o: "low stock", r: "almost out", n: "" };
 const STOCK_FILTERS = [
   ["all",  "All"],
   ["have", "In stock"],
@@ -189,11 +190,12 @@ function stockEl(p, sarasas) {
   box.className = "stock " + c;
   const dot = document.createElement("i");
   box.appendChild(dot);
-  if (c === "r") {
-    const u = document.createElement("u"); u.textContent = STOCK_LABELS.r;
+  const kiek = Number(p.s) || 0;
+  if (kiek <= 0) {
+    const u = document.createElement("u"); u.textContent = "out of stock";
     box.appendChild(u);
   } else {
-    const b = document.createElement("b"); b.textContent = p.s;
+    const b = document.createElement("b"); b.textContent = kiek;
     const u = document.createElement("u"); u.textContent = STOCK_LABELS[c];
     box.append(b, u);
   }
