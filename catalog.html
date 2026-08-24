@@ -37,7 +37,6 @@
   .chip { border:1px solid var(--line); background:var(--card); color:var(--muted);
           border-radius:20px; padding:6px 13px; font-size:13px; cursor:pointer; }
   .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
-  #brandchips .chip { font-weight:600; padding:8px 14px; }
   .chip u { font-style:normal; text-decoration:none; opacity:.7; margin-left:5px; }
 
   /* ---- grid ----
@@ -112,9 +111,6 @@
     </div>
   </div>
 
-  <div class="bar" id="brandbar">
-    <div class="chips" id="brandchips"></div>
-  </div>
   <div class="bar">
     <input type="search" id="q" placeholder="Search SKU…" autocomplete="off">
     <div class="chips" id="chips"></div>
@@ -175,22 +171,19 @@ const kiekis = p => Number(p.s) || 0;
    and a page where every tile is badged says nothing at all. */
 const ZENKLAI = { hot: ["🔥", "selling fast"], slow: ["💤", "not moving"] };
 
+function zenklasEl(p) {
+  const z = ZENKLAI[p.t];
+  if (!z) return null;
+  const em = document.createElement("em");
+  em.className = p.t;
+  em.textContent = z[0];
+  em.title = z[1];
+  return em;
+}
+
 const $ = s => document.querySelector(s);
-const visosPrekes = DATA.produktai || [];
-
-/* Two separate catalogues, not one list with a filter: Pandora is a different
-   supplier and mixing it into "Charms" would answer the wrong question. The
-   brand switch decides which catalogue is on screen; every count, chip and
-   search below works inside that catalogue only. */
-const BRANDAI = [
-  ["sava",    "Our products", p => p.k !== "pandora"],
-  ["pandora", "Pandora",      p => p.k === "pandora"],
-];
-let brand = "sava";
-const grupe = () => (BRANDAI.find(b => b[0] === brand) || BRANDAI[0])[2];
-let items = visosPrekes.filter(grupe());
-
-const turimStock = visosPrekes.some(p => (p.c && p.c !== "n") || p.t);
+const items = DATA.produktai || [];
+const turimStock = items.some(p => (p.c && p.c !== "n") || p.t);
 let kat = "all";
 let stockFilter = "all";
 let query = "";
@@ -208,20 +201,16 @@ function stockEl(p, sarasas) {
   // and the grid does not go ragged. In the lightbox there is nothing to align,
   // so an unknown one says nothing at all.
   if (c === "n" && !sarasas) return null;
-  // Not counted yet still says how it sells — that part is known from the
-  // shipping labels alone and does not wait for anyone to walk the shelves.
   if (c === "n") {
     const tuscia = document.createElement("div");
     tuscia.className = "stock n";
     const dot = document.createElement("i");
     const u = document.createElement("u"); u.textContent = "—";
     tuscia.append(dot, u);
-    const z = ZENKLAI[p.t];
-    if (z) {
-      const em = document.createElement("em");
-      em.className = p.t; em.textContent = z[0]; em.title = z[1];
-      tuscia.appendChild(em);
-    }
+    // How it sells is known from the shipping labels alone, so the mark does
+    // not wait for anyone to walk the shelves and count.
+    const z = zenklasEl(p);
+    if (z) tuscia.appendChild(z);
     return tuscia;
   }
   const box = document.createElement("div");
@@ -237,14 +226,8 @@ function stockEl(p, sarasas) {
     const u = document.createElement("u"); u.textContent = STOCK_LABELS[c];
     box.append(b, u);
   }
-  const zenklas = ZENKLAI[p.t];
-  if (zenklas) {
-    const em = document.createElement("em");
-    em.className = p.t;
-    em.textContent = zenklas[0];
-    em.title = zenklas[1];
-    box.appendChild(em);
-  }
+  const z = zenklasEl(p);
+  if (z) box.appendChild(z);
   return box;
 }
 
@@ -278,30 +261,6 @@ function renderStockChips() {
       s.appendChild(u);
     }
     s.addEventListener("click", () => { stockFilter = key; renderStockChips(); render(); });
-    box.appendChild(s);
-  }
-}
-
-function renderBrandChips() {
-  const box = $("#brandchips");
-  box.innerHTML = "";
-  const rodyti = BRANDAI.filter(([, , fn]) => visosPrekes.some(fn));
-  $("#brandbar").hidden = rodyti.length < 2;      // nėra Pandoros — nėra ir jungiklio
-  for (const [key, label, fn] of rodyti) {
-    const s = document.createElement("span");
-    s.className = "chip" + (brand === key ? " on" : "");
-    s.textContent = label;
-    const u = document.createElement("u");
-    u.textContent = visosPrekes.filter(fn).length;
-    s.appendChild(u);
-    s.addEventListener("click", () => {
-      if (brand === key) return;
-      brand = key;
-      items = visosPrekes.filter(grupe());
-      kat = "all";                                 // tipai kiekviename kataloge savi
-      stockFilter = "all";
-      renderBrandChips(); renderStockChips(); renderChips(); render();
-    });
     box.appendChild(s);
   }
 }
@@ -380,7 +339,6 @@ document.addEventListener("keydown", e => {
 });
 $("#q").addEventListener("input", e => { query = e.target.value; render(); });
 
-renderBrandChips();
 renderChips();
 renderStockChips();
 render();
