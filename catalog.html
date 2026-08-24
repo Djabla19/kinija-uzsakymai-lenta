@@ -61,9 +61,11 @@
      never means two different things in two places. */
   /* Above the photo, not under the name: the first thing anyone asks of this
      page is "do we have it", so the answer sits where the eye lands first. */
-  .stock { display:flex; align-items:center; gap:6px;
+  /* Fixed height: a tile showing a number and a tile showing a dash have to
+     line up, or the whole grid goes half a step out of step. */
+  .stock { display:flex; align-items:center; gap:6px; height:32px;
            font-size:12px; font-weight:600;
-           padding:8px 11px 7px; border-bottom:1px solid var(--line); }
+           padding:0 11px; border-bottom:1px solid var(--line); }
   .stock i { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
   .stock b { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; }
   .stock u { font-weight:400; text-decoration:none; color:var(--muted);
@@ -147,12 +149,17 @@ const EILE = ["charms", "earrings", "necklaces", "bracelets", "rings", "other"];
    product selling twenty a day is red at 100 pieces. So the number is always
    shown; only a real zero says out of stock. */
 const STOCK_LABELS = { g: "in stock", o: "low stock", r: "almost out", n: "" };
+/* Red and empty are different answers to "can I sell this today": red still
+   has pieces, it just will not have them next week. So they get their own
+   chips instead of being lumped together. */
 const STOCK_FILTERS = [
-  ["all",  "All"],
-  ["have", "In stock"],
-  ["low",  "Low"],
-  ["out",  "Out of stock"],
+  ["all",    "All",         () => true],
+  ["have",   "In stock",    p => kiekis(p) > 0],
+  ["low",    "Low",         p => p.c === "o"],
+  ["almost", "Almost out",  p => p.c === "r" && kiekis(p) > 0],
+  ["out",    "Out of stock", p => p.c && p.c !== "n" && kiekis(p) <= 0],
 ];
+const kiekis = p => Number(p.s) || 0;
 
 const $ = s => document.querySelector(s);
 const items = DATA.produktai || [];
@@ -162,12 +169,8 @@ let stockFilter = "all";
 let query = "";
 
 function stockOk(p) {
-  const c = p.c || "n";
-  if (stockFilter === "all")  return true;
-  if (stockFilter === "have") return c === "g" || c === "o";
-  if (stockFilter === "low")  return c === "o";
-  if (stockFilter === "out")  return c === "r";
-  return true;
+  const f = STOCK_FILTERS.find(x => x[0] === stockFilter);
+  return f ? f[2](p) : true;
 }
 
 /* A count of 0 and "we never counted this one" look the same if both show a
@@ -220,20 +223,16 @@ function visible() {
 function renderStockChips() {
   $("#stockbar").hidden = !turimStock;
   if (!turimStock) return;
-  const counts = { have:0, low:0, out:0 };
-  for (const p of items) {
-    if (p.c === "g" || p.c === "o") counts.have++;
-    if (p.c === "o") counts.low++;
-    if (p.c === "r") counts.out++;
-  }
   const box = $("#stockchips");
   box.innerHTML = "";
-  for (const [key, label] of STOCK_FILTERS) {
+  for (const [key, label, fn] of STOCK_FILTERS) {
     const s = document.createElement("span");
     s.className = "chip" + (stockFilter === key ? " on" : "");
     s.textContent = label;
     if (key !== "all") {
-      const u = document.createElement("u"); u.textContent = counts[key]; s.appendChild(u);
+      const u = document.createElement("u");
+      u.textContent = items.filter(fn).length;
+      s.appendChild(u);
     }
     s.addEventListener("click", () => { stockFilter = key; renderStockChips(); render(); });
     box.appendChild(s);
