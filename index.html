@@ -37,6 +37,7 @@
   .stat span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
 
   /* ---- tabs ---- */
+  .tabs[hidden] { display:none; }   /* `display:flex` below would out-argue `hidden` */
   .tabs { display:flex; gap:4px; margin:22px 0 0; border-bottom:1px solid var(--line);
           overflow-x:auto; }
   .tab { border:0; background:transparent; color:var(--muted); font-size:15px; font-weight:600;
@@ -121,6 +122,8 @@
   .c-week { width:78px; text-align:center; } .c-left { width:74px; text-align:center; }
   .c-incoming { width:82px; text-align:center; } .c-suggest { width:92px; text-align:center; }
   .c-counted { width:104px; }
+  .c-add { width:86px; }
+  td.c-add input { width:70px; text-align:right; font-weight:600; color:var(--s-received); }
 
   .stk { display:inline-flex; align-items:center; gap:7px; }
   .stk i { width:9px; height:9px; border-radius:50%; background:var(--muted); flex:none; }
@@ -304,6 +307,13 @@ const SUPABASE_URL = readCfg("u", "board_url");
 const SUPABASE_KEY = readCfg("k", "board_key");
 const DEMO = !SUPABASE_URL || !SUPABASE_KEY;
 const POLL_MS = 4000;
+
+/* Adding `&only=stock` to the link opens the page on that one tab and hides
+   the rest. The warehouse needs to type counts; it has no business seeing
+   customer addresses and phone numbers, and cannot delete an order it never
+   sees. Not remembered between visits — a plain link is a plain board. */
+const ONLY = (new URLSearchParams(location.hash.replace(/^#/, "")).get("only") || "")
+  .split(",").map(s => s.trim()).filter(Boolean);
 
 /* ---------------------------------------------------------------
    Four boards on one page, holding two different kinds of work.
@@ -514,6 +524,7 @@ function stockView() {
       { key:"photo",   label:"",          kind:"photo" },
       { key:"sku",     label:"SKU",       cls:"mono", ph:"KTE092" },
       { key:"instock", label:"In stock",  kind:"stock" },
+      { key:"add",     label:"+ Arrived", kind:"add" },
       num("Sold 7d",  "s7",       i => i.s30 || i.s7 ? i.s7 : ""),
       num("Sold 30d", "s30",      i => i.s30 || ""),
       num("Per week", "week",     i => i.perWeek || ""),
@@ -589,9 +600,16 @@ const VIEWS = {
   },
 };
 
+// `&only=` in the link narrows the page down to the named tabs.
+for (const key of Object.keys(VIEWS)) {
+  if (ONLY.length && !ONLY.includes(key)) delete VIEWS[key];
+}
+const PIRMAS = Object.keys(VIEWS)[0] || "silver";
+
 let viewKey = (() => {
-  try { return VIEWS[localStorage.getItem("board_view")] ? localStorage.getItem("board_view") : "silver"; }
-  catch (e) { return "silver"; }
+  if (ONLY.length) return PIRMAS;
+  try { return VIEWS[localStorage.getItem("board_view")] ? localStorage.getItem("board_view") : PIRMAS; }
+  catch (e) { return PIRMAS; }
 })();
 let view = VIEWS[viewKey];
 let rows = [];            // server truth for the open tab
@@ -694,6 +712,7 @@ function setSync(state, msg) {
 function renderTabs() {
   const box = $("#tabs");
   box.innerHTML = "";
+  box.hidden = Object.keys(VIEWS).length < 2;   // one tab is not a choice
   for (const [key, v] of Object.entries(VIEWS)) {
     const b = document.createElement("button");
     b.className = "tab" + (key === viewKey ? " on" : "");
@@ -906,11 +925,39 @@ function refreshStock(id) {
   const info = stkInfo(r);
   const box = tr.querySelector(".c-instock .stk");
   if (box) box.className = "stk " + info.colour;
+  // The count itself moves too — an arrival typed on the right has to show up
+  // on the left immediately. Never while it is being typed in, though.
+  const laukas = tr.querySelector(".c-instock input");
+  if (laukas && document.activeElement !== laukas) {
+    laukas.value = info.counted ? info.left : "";
+  }
   for (const col of view.cols) {
     if (col.kind !== "calc") continue;
     const td = tr.querySelector(".c-" + col.key);
     if (td) { td.innerHTML = ""; td.appendChild(calcCell(r, col)); }
   }
+}
+
+/* A box arrives from China and the warehouse counts what is in it — not the
+   whole shelf. So this column adds to what is already there instead of
+   replacing it, and empties itself afterwards. Recounting everything just to
+   record twenty new pieces is how counts stop being done at all. */
+function addCell(r) {
+  const el = document.createElement("input");
+  el.type = "number";
+  el.className = "mono";
+  el.placeholder = "+";
+  el.title = "how many just arrived — added to the number on the left";
+  el.addEventListener("focus", () => { editing = r.id + ":add"; });
+  el.addEventListener("blur",  () => { if (editing === r.id + ":add") editing = null; });
+  el.addEventListener("change", () => {
+    const n = Number(el.value);
+    el.value = "";
+    if (!n) return;
+    const naujas = stkInfo(r).left + n;
+    save(r.id, "baseline_qty", naujas, { baseline_date: today() });
+  });
+  return el;
 }
 
 function calcCell(r, col) {
@@ -962,6 +1009,7 @@ function render() {
       else if (col.kind === "photo")  td.appendChild(photoCell(r));
       else if (col.kind === "days")   td.appendChild(daysCell(r));
       else if (col.kind === "stock")  td.appendChild(stockCell(r));
+      else if (col.kind === "add")    td.appendChild(addCell(r));
       else if (col.kind === "calc")   td.appendChild(calcCell(r, col));
       else                            td.appendChild(cellInput(r, col));
       tr.appendChild(td);
@@ -969,10 +1017,14 @@ function render() {
 
     const tdDel = document.createElement("td");
     tdDel.className = "c-del"; tdDel.dataset.l = "";
-    const del = document.createElement("button");
-    del.className = "del"; del.title = "Delete"; del.textContent = "✕";
-    del.addEventListener("click", () => removeRow(r));
-    tdDel.appendChild(del);
+    // A narrowed-down page is someone else's workplace: they add and count,
+    // they do not remove products from the list.
+    if (!ONLY.length) {
+      const del = document.createElement("button");
+      del.className = "del"; del.title = "Delete"; del.textContent = "✕";
+      del.addEventListener("click", () => removeRow(r));
+      tdDel.appendChild(del);
+    }
     tr.appendChild(tdDel);
 
     tb.appendChild(tr);
@@ -1258,6 +1310,10 @@ document.addEventListener("keydown", e => {
 
 $("#q").placeholder = view.search;
 $("#add").textContent = view.addLabel || "+ New order";
+if (ONLY.length === 1) {
+  document.querySelector("h1").textContent = view.label === "Stock" ? "Warehouse stock" : view.label;
+  document.title = document.querySelector("h1").textContent;
+}
 renderTabs(); renderHead(); renderChips(); render();
 sync();
 stkSync();
