@@ -617,7 +617,11 @@ let viewKey = (() => {
 let view = VIEWS[viewKey];
 let rows = [];            // server truth for the open tab
 let counts = {};          // tab -> how many rows, for the tab labels
-let filter = view.filters[0].key;
+// The owner opens the board to see what needs ordering; the warehouse opens it
+// to look a product up. Same tab, different first question.
+let filter = (ONLY.length
+  ? (view.filters.find(x => x.key === "all") || view.filters[0])
+  : view.filters[0]).key;
 let query = "";
 let editing = null;       // id:field currently focused — never overwritten by a poll
 let pending = new Map();  // id -> {field:value} not yet confirmed by the server
@@ -1082,6 +1086,16 @@ async function addRow() {
                               updated_at: new Date().toISOString() }, view.blank());
   const v = view;
   rows.unshift(row);
+  // A brand new row is empty, and an empty row falls outside most filters —
+  // so it would be created and vanish in the same breath. Whatever is being
+  // looked at, a row just added has to be on screen.
+  const f = view.filters.find(x => x.key === filter);
+  if (f && !f.fn(row)) {
+    filter = (view.filters.find(x => x.key === "all") || view.filters[0]).key;
+    renderChips();
+  }
+  query = "";
+  $("#q").value = "";
   render();
   const first = document.querySelector(`tr[data-id="${row.id}"] .c-sku input`);
   if (first) first.focus();
@@ -1210,7 +1224,9 @@ function switchView(key) {
   rows = [];
   pending = new Map();
   editing = null;
-  filter = view.filters[0].key;
+  filter = (ONLY.length
+    ? (view.filters.find(x => x.key === "all") || view.filters[0])
+    : view.filters[0]).key;
   $("#q").placeholder = view.search;
   $("#add").textContent = view.addLabel || "+ New order";
   renderTabs(); renderHead(); renderChips(); render();
