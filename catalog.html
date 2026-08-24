@@ -53,6 +53,29 @@
            font-family:ui-monospace,Menlo,Consolas,monospace; }
   .cap span { display:block; font-size:11px; color:var(--muted); margin-top:2px;
               text-transform:uppercase; letter-spacing:.5px; }
+
+  /* ---- stock ----
+     Green / amber / red is not about the size of the number but about how
+     long it will last at the current selling speed — 200 pieces is red if
+     twenty go out every day. Same rule as the orders board, so a colour
+     never means two different things in two places. */
+  /* Above the photo, not under the name: the first thing anyone asks of this
+     page is "do we have it", so the answer sits where the eye lands first. */
+  .stock { display:flex; align-items:center; gap:6px;
+           font-size:12px; font-weight:600;
+           padding:8px 11px 7px; border-bottom:1px solid var(--line); }
+  .stock i { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
+  .stock b { font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:700; }
+  .stock u { font-weight:400; text-decoration:none; color:var(--muted);
+             text-transform:uppercase; letter-spacing:.4px; font-size:10px; }
+  .stock.g { color:#1a9c53; } .stock.g i { background:#2ecc71; }
+  .stock.o { color:#c47f00; } .stock.o i { background:#f5a623; }
+  .stock.r { color:#d13a3f; } .stock.r i { background:#e5484d; }
+  .stock.n { color:var(--muted); }
+  @media (prefers-color-scheme: dark) {
+    .stock.g { color:#41d47f; } .stock.o { color:#ffb84d; } .stock.r { color:#ff6b6f; }
+  }
+  .lb figcaption .stock { justify-content:center; color:#fff; border:0; margin-top:6px; }
   .empty { padding:60px 20px; text-align:center; color:var(--muted); }
 
   /* ---- lightbox ---- */
@@ -85,6 +108,9 @@
     <input type="search" id="q" placeholder="Search SKU…" autocomplete="off">
     <div class="chips" id="chips"></div>
   </div>
+  <div class="bar" id="stockbar" hidden>
+    <div class="chips" id="stockchips"></div>
+  </div>
 
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" hidden>Nothing matches that search.</div>
@@ -114,10 +140,65 @@ const TIPAI = {
 };
 const EILE = ["charms", "earrings", "necklaces", "bracelets", "rings", "other"];
 
+/* Stock travels inside this file too — a number and a colour written in at
+   publish time, refreshed every night. There is still no database key here:
+   the page shows what it was given and can reach nothing else. */
+const STOCK_LABELS = {
+  g: "in stock", o: "low stock", r: "out of stock", n: "",
+};
+const STOCK_FILTERS = [
+  ["all",  "All"],
+  ["have", "In stock"],
+  ["low",  "Low"],
+  ["out",  "Out of stock"],
+];
+
 const $ = s => document.querySelector(s);
 const items = DATA.produktai || [];
+const turimStock = items.some(p => p.c && p.c !== "n");
 let kat = "all";
+let stockFilter = "all";
 let query = "";
+
+function stockOk(p) {
+  const c = p.c || "n";
+  if (stockFilter === "all")  return true;
+  if (stockFilter === "have") return c === "g" || c === "o";
+  if (stockFilter === "low")  return c === "o";
+  if (stockFilter === "out")  return c === "r";
+  return true;
+}
+
+/* A count of 0 and "we never counted this one" look the same if both show a
+   dash, so only a real number gets a number — the rest just say nothing. */
+function stockEl(p, sarasas) {
+  const c = p.c || "n";
+  // Uncounted still gets a bar (just a dash) so the tiles stay the same height
+  // and the grid does not go ragged. In the lightbox there is nothing to align,
+  // so an unknown one says nothing at all.
+  if (c === "n" && !sarasas) return null;
+  if (c === "n") {
+    const tuscia = document.createElement("div");
+    tuscia.className = "stock n";
+    const dot = document.createElement("i");
+    const u = document.createElement("u"); u.textContent = "—";
+    tuscia.append(dot, u);
+    return tuscia;
+  }
+  const box = document.createElement("div");
+  box.className = "stock " + c;
+  const dot = document.createElement("i");
+  box.appendChild(dot);
+  if (c === "r") {
+    const u = document.createElement("u"); u.textContent = STOCK_LABELS.r;
+    box.appendChild(u);
+  } else {
+    const b = document.createElement("b"); b.textContent = p.s;
+    const u = document.createElement("u"); u.textContent = STOCK_LABELS[c];
+    box.append(b, u);
+  }
+  return box;
+}
 
 /* p.f is the storage file name. For coded products it equals the SKU, but
    themed ones ("Double hoop circle") are stored stripped of spaces, so the
@@ -130,7 +211,31 @@ function visible() {
   const q = query.trim().toLowerCase();
   return items.filter(p =>
     (kat === "all" || p.tipas === kat) &&
+    stockOk(p) &&
     (!q || p.sku.toLowerCase().includes(q)));
+}
+
+function renderStockChips() {
+  $("#stockbar").hidden = !turimStock;
+  if (!turimStock) return;
+  const counts = { have:0, low:0, out:0 };
+  for (const p of items) {
+    if (p.c === "g" || p.c === "o") counts.have++;
+    if (p.c === "o") counts.low++;
+    if (p.c === "r") counts.out++;
+  }
+  const box = $("#stockchips");
+  box.innerHTML = "";
+  for (const [key, label] of STOCK_FILTERS) {
+    const s = document.createElement("span");
+    s.className = "chip" + (stockFilter === key ? " on" : "");
+    s.textContent = label;
+    if (key !== "all") {
+      const u = document.createElement("u"); u.textContent = counts[key]; s.appendChild(u);
+    }
+    s.addEventListener("click", () => { stockFilter = key; renderStockChips(); render(); });
+    box.appendChild(s);
+  }
 }
 
 function renderChips() {
@@ -164,6 +269,9 @@ function render() {
     const el = document.createElement("div");
     el.className = "item";
 
+    const st = turimStock ? stockEl(p, true) : null;
+    if (st) el.appendChild(st);
+
     const ph = document.createElement("div");
     ph.className = "ph";
     const img = document.createElement("img");
@@ -193,6 +301,8 @@ function openLb(p) {
   const em = document.createElement("em");
   em.textContent = TIPAI[p.tipas] || p.tipas;
   $("#lbcap").appendChild(em);
+  const st = stockEl(p);
+  if (st) $("#lbcap").appendChild(st);
   $("#lb").classList.add("on");
 }
 
@@ -203,6 +313,7 @@ document.addEventListener("keydown", e => {
 $("#q").addEventListener("input", e => { query = e.target.value; render(); });
 
 renderChips();
+renderStockChips();
 render();
 </script>
 </body>
