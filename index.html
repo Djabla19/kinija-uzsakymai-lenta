@@ -467,7 +467,9 @@ function stkRebuild() {
     const s30 = sum(list, daysAgo(STK.window), now);
     const s60 = sum(list, daysAgo(STK.dead), now);
     const perDay = s30 / covered;
-    const leftDays = perDay > 0 ? Math.floor(left / perDay) : null;
+    // How long it will last can only be said once we know how many there are;
+    // for an uncounted product a zero would read as "sold out", which is false.
+    const leftDays = (counted && perDay > 0) ? Math.floor(left / perDay) : null;
 
     let colour = "grey";
     if (counted) {
