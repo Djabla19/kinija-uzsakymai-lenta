@@ -614,30 +614,36 @@ const api = {
   // now live in the same table and must never see each other's rows.
   demoKey(v) { return "demo_" + v.table + (v.category ? "_" + v.category : ""); },
   where(v) { return v.category ? `&category=eq.${encodeURIComponent(v.category)}` : ""; },
+  // Supabase caps every response at a thousand rows and ignores a bigger
+  // `limit` without saying so — a silent half-truth is worse than an error,
+  // so every read walks through the pages.
+  async page(path) {
+    const PAGE = 1000, out = [];
+    for (;;) {
+      const sep = path.includes("?") ? "&" : "?";
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}${sep}limit=${PAGE}&offset=${out.length}`,
+                            { headers: api.headers(), cache: "no-store" });
+      if (!r.ok) throw new Error("load " + r.status);
+      const part = await r.json();
+      out.push(...part);
+      if (part.length < PAGE) return out;
+    }
+  },
   async list(v) {
     if (DEMO) return JSON.parse(localStorage.getItem(api.demoKey(v)) || "[]");
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${v.table}?select=*${api.where(v)}` +
-                          `&order=${v.order || "order_date.desc,created_at.desc"}&limit=5000`,
-                          { headers: api.headers(), cache: "no-store" });
-    if (!r.ok) throw new Error("load " + r.status);
-    return r.json();
+    return api.page(`${v.table}?select=*${api.where(v)}` +
+                    `&order=${v.order || "order_date.desc,created_at.desc"}`);
   },
   // Sales and orders back the computed columns in the Stock tab. They are
   // read on their own, slower clock — the row list still refreshes every few
   // seconds, but a year of sales does not need to travel with it.
   async stockData() {
     if (DEMO) return { sales: [], orders: [], days: [] };
-    const get = async path => {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,
-                            { headers: api.headers(), cache: "no-store" });
-      if (!r.ok) throw new Error("stock " + r.status);
-      return r.json();
-    };
     const from = daysAgo(400);
     const [sales, orders, days] = await Promise.all([
-      get(`sales?select=sold_date,sku,qty&sold_date=gte.${from}&limit=100000`),
-      get(`orders?select=sku,qty,status,order_date&limit=20000`),
-      get(`sales_scan?select=scan_date&scan_date=gte.${daysAgo(40)}&limit=100`),
+      api.page(`sales?select=sold_date,sku,qty&sold_date=gte.${from}&order=sold_date.asc,sku.asc`),
+      api.page(`orders?select=sku,qty,status,order_date&order=id.asc`),
+      api.page(`sales_scan?select=scan_date&scan_date=gte.${daysAgo(40)}&order=scan_date.desc`),
     ]);
     return { sales, orders, days };
   },
