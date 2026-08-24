@@ -112,6 +112,31 @@
   td.c-days span { font-size:12px; color:var(--muted); }
   td.c-days span.late { color:#fff; background:var(--s-problem); font-weight:600;
                         border-radius:20px; padding:2px 8px; }
+  /* ---- stock ----
+     Green / amber / red is not about how many pieces are on the shelf but
+     about how long they will last at the current selling speed: 200 pieces
+     is red if twenty go out every day. One rule, used on this page and in
+     the catalogue, so a colour never means two different things. */
+  .c-instock { width:104px; } .c-s7, .c-s30 { width:62px; text-align:center; }
+  .c-week { width:78px; text-align:center; } .c-left { width:74px; text-align:center; }
+  .c-incoming { width:82px; text-align:center; } .c-suggest { width:92px; text-align:center; }
+  .c-counted { width:104px; }
+
+  .stk { display:inline-flex; align-items:center; gap:7px; }
+  .stk i { width:9px; height:9px; border-radius:50%; background:var(--muted); flex:none; }
+  .stk input { width:64px; font-weight:700; text-align:right; }
+  .stk.green  i { background:var(--s-received); } .stk.green  input { color:var(--s-received); }
+  .stk.orange i { background:var(--s-production); } .stk.orange input { color:var(--s-production); }
+  .stk.red    i { background:var(--s-problem); } .stk.red    input { color:var(--s-problem); }
+  .stk.grey   input { color:var(--muted); font-weight:400; }
+
+  td.c-left b, td.c-s7 b, td.c-s30 b, td.c-week b, td.c-incoming b, td.c-suggest b {
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:600; font-size:13px; }
+  td.c-left b.red { color:var(--s-problem); } td.c-left b.orange { color:var(--s-production); }
+  td.c-suggest b { color:var(--accent); }
+  .tag { font-size:11px; margin-left:5px; }
+  .muted-cell { color:var(--muted); font-weight:400 !important; }
+
   select.st { font-weight:600; font-size:13px; border-radius:20px; }
   select.st[data-v=ordered]     { color:var(--s-ordered); }
   select.st[data-v=production]  { color:var(--s-production); }
@@ -352,12 +377,177 @@ function bulkView(label, category, opts) {
   };
 }
 
+/* ---------------------------------------------------------------
+   Stock.
+
+   The number in this tab is never stored — it is worked out every time:
+
+       in stock = counted + arrived from China - sold since the count
+
+   "Counted" is a number with a date on it, and selling is read out of the
+   shipping labels that land in the mailbox every day. Keeping a running
+   total instead would mean a second scan of the same day quietly removes
+   the same pieces twice, and a day the computer was off is lost forever.
+
+   Typing a number into the column sets a new count as of today — which is
+   exactly what someone standing in the warehouse means by it.
+----------------------------------------------------------------*/
+const STK = { trip:14, red:14, amber:28, cover:60, window:30, dead:60, round:10 };
+
+let stkSales = [], stkOrders = [], stkDays = new Set();
+let stkVer = 0, stkMemo = new Map(), stkMemoVer = -1;
+const STK_NONE = { counted:false, left:0, s7:0, s30:0, perDay:0, perWeek:0,
+                   left_days:null, incoming:0, hot:false, dead:false, colour:"grey", suggest:0 };
+
+// Codes are matched the same way the product photo is looked up, so the two
+// can never disagree about which product a row is about.
+function stockMap(list) {
+  const m = new Map(), loose = new Map();
+  for (const r of list) { const k = photoNames(r.sku)[0]; if (k) m.set(k, r.sku); }
+  for (const r of list) for (const k of photoNames(r.sku).slice(1)) {
+    if (m.has(k)) continue;
+    if (!loose.has(k)) loose.set(k, new Set());
+    loose.get(k).add(r.sku);
+  }
+  // A stripped code claimed by two products (KTC165-A and KTC165-B) is dropped:
+  // better to leave a sale unmatched than to take it off the wrong variant.
+  for (const [k, who] of loose) if (who.size === 1) m.set(k, [...who][0]);
+  return m;
+}
+function stockMatch(sku, m) { for (const k of photoNames(sku)) if (m.has(k)) return m.get(k); return null; }
+
+function daysAgo(n) { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - n); return iso(d); }
+
+function stkRebuild() {
+  stkMemo = new Map();
+  const m = stockMap(rows);
+  const sold = new Map(), incoming = new Map(), arrived = new Map();
+
+  for (const s of stkSales) {
+    const t = stockMatch(s.sku, m); if (!t) continue;
+    if (!sold.has(t)) sold.set(t, []);
+    sold.get(t).push([String(s.sold_date).slice(0, 10), +s.qty || 0]);
+  }
+  for (const o of stkOrders) {
+    const t = stockMatch(o.sku, m); if (!t) continue;
+    const q = +o.qty || 0;
+    if (o.status === "received") {
+      if (!arrived.has(t)) arrived.set(t, []);
+      arrived.get(t).push([String(o.order_date || "").slice(0, 10), q]);
+    } else if (o.status !== "problem") {
+      incoming.set(t, (incoming.get(t) || 0) + q);
+    }
+  }
+
+  const sum = (list, from, to) =>
+    (list || []).reduce((n, [d, q]) => (d && d >= from && d <= to ? n + q : n), 0);
+  // Everything that happened AFTER the count day. What went out on the day
+  // itself was already off the shelf when it was counted — subtracting it
+  // again would show one day less stock than there is.
+  const sumAfter = (list, from, to) =>
+    (list || []).reduce((n, [d, q]) => (d && d > from && d <= to ? n + q : n), 0);
+  const now = iso(new Date());
+
+  // The speed is divided by the days actually read, not by a flat 30 — in the
+  // first week a 30-day divisor would show a tenth of the real rate.
+  let covered = 0;
+  for (let i = 0; i < STK.window; i++) if (stkDays.has(daysAgo(i))) covered++;
+  covered = covered || 1;
+
+  for (const r of rows) {
+    const list = sold.get(r.sku);
+    const counted = r.baseline_qty != null;
+    const base = +r.baseline_qty || 0;
+    const from = String(r.baseline_date || "").slice(0, 10);
+    const left = (counted && from)
+      ? base - sumAfter(list, from, now) + sumAfter(arrived.get(r.sku), from, now)
+      : base;
+
+    const s7 = sum(list, daysAgo(7), now);
+    const s30 = sum(list, daysAgo(STK.window), now);
+    const s60 = sum(list, daysAgo(STK.dead), now);
+    const perDay = s30 / covered;
+    const leftDays = perDay > 0 ? Math.floor(left / perDay) : null;
+
+    let colour = "grey";
+    if (counted) {
+      if (left <= 0) colour = "red";
+      else if (leftDays === null) colour = "green";
+      else if (leftDays < STK.red) colour = "red";
+      else if (leftDays < STK.amber) colour = "orange";
+      else colour = "green";
+    }
+    const need = perDay > 0 ? perDay * (STK.trip + STK.cover) - left - (incoming.get(r.sku) || 0) : 0;
+
+    stkMemo.set(r.id, {
+      counted, base, baseDate: from, left, s7, s30, perDay,
+      perWeek: Math.round(perDay * 70) / 10,
+      left_days: leftDays, incoming: incoming.get(r.sku) || 0,
+      hot: s30 >= 10 && perDay > 0 && (s7 / 7) >= perDay * 1.3,
+      dead: counted && left > 0 && s60 === 0,
+      colour,
+      suggest: (counted && leftDays !== null && leftDays < STK.amber && need > 0)
+        ? Math.ceil(need / STK.round) * STK.round : 0,
+    });
+  }
+}
+
+function stkInfo(r) {
+  if (stkMemoVer !== stkVer) { stkRebuild(); stkMemoVer = stkVer; }
+  return stkMemo.get(r.id) || STK_NONE;
+}
+
+function stockView() {
+  const num = (label, key, pick, cls) => ({
+    key, label, kind:"calc", cls, pick,
+  });
+  return {
+    label: "Stock",
+    table: "stock",
+    stock: true,
+    order: "sku.asc",
+    search: "Search SKU…",
+    addLabel: "+ New product",
+    cols: [
+      { key:"photo",   label:"",          kind:"photo" },
+      { key:"sku",     label:"SKU",       cls:"mono", ph:"KTE092" },
+      { key:"instock", label:"In stock",  kind:"stock" },
+      num("Sold 7d",  "s7",       i => i.s30 || i.s7 ? i.s7 : ""),
+      num("Sold 30d", "s30",      i => i.s30 || ""),
+      num("Per week", "week",     i => i.perWeek || ""),
+      num("Days left","left",     i => i.left_days == null ? "" : i.left_days + "d"),
+      num("On order", "incoming", i => i.incoming || ""),
+      num("Reorder",  "suggest",  i => i.suggest || ""),
+      { key:"baseline_date", label:"Counted on", type:"date", cls:"mono" },
+      { key:"note",    label:"Notes",     tag:"textarea", ph:"notes" },
+    ],
+    blank: () => ({ sku:"", baseline_qty:null, baseline_date:null, note:"" }),
+    done: () => false,
+    stats: [
+      { label:"Products",  fn: () => true },
+      { label:"Counted",   fn: r => stkInfo(r).counted },
+      { label:"Order now", fn: r => stkInfo(r).colour === "orange" || (stkInfo(r).colour === "red" && stkInfo(r).left > 0) },
+      { label:"Out",       fn: r => stkInfo(r).counted && stkInfo(r).left <= 0 },
+      { label:"Selling fast", fn: r => stkInfo(r).hot },
+    ],
+    filters: [
+      { key:"low",     label:"Order now", fn: r => ["red","orange"].includes(stkInfo(r).colour) },
+      { key:"all",     label:"All",       fn: () => true },
+      { key:"out",     label:"Out",       fn: r => stkInfo(r).counted && stkInfo(r).left <= 0 },
+      { key:"hot",     label:"Selling fast", fn: r => stkInfo(r).hot },
+      { key:"dead",    label:"Not moving", fn: r => stkInfo(r).dead },
+      { key:"nocount", label:"Not counted", fn: r => !stkInfo(r).counted },
+    ],
+  };
+}
+
 const VIEWS = {
   silver:  bulkView("Silver unbranded", "silver"),
   pandora: bulkView("Pandora",          "pandora"),
   pearl:   bulkView("Pearl Jewellery",  "pearl",         { ship:true }),
   bd:      bulkView("B/D Modian Silver Sterling", "bd",   { ship:true }),
   ac:      bulkView("A/C Modian Silver Sterling", "ac",   { ship:true }),
+  stock:   stockView(),
 
   personalised: {
     label: "Personalised",
@@ -425,10 +615,29 @@ const api = {
   async list(v) {
     if (DEMO) return JSON.parse(localStorage.getItem(api.demoKey(v)) || "[]");
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${v.table}?select=*${api.where(v)}` +
-                          `&order=order_date.desc,created_at.desc`,
+                          `&order=${v.order || "order_date.desc,created_at.desc"}&limit=5000`,
                           { headers: api.headers(), cache: "no-store" });
     if (!r.ok) throw new Error("load " + r.status);
     return r.json();
+  },
+  // Sales and orders back the computed columns in the Stock tab. They are
+  // read on their own, slower clock — the row list still refreshes every few
+  // seconds, but a year of sales does not need to travel with it.
+  async stockData() {
+    if (DEMO) return { sales: [], orders: [], days: [] };
+    const get = async path => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`,
+                            { headers: api.headers(), cache: "no-store" });
+      if (!r.ok) throw new Error("stock " + r.status);
+      return r.json();
+    };
+    const from = daysAgo(400);
+    const [sales, orders, days] = await Promise.all([
+      get(`sales?select=sold_date,sku,qty&sold_date=gte.${from}&limit=100000`),
+      get(`orders?select=sku,qty,status,order_date&limit=20000`),
+      get(`sales_scan?select=scan_date&scan_date=gte.${daysAgo(40)}&limit=100`),
+    ]);
+    return { sales, orders, days };
   },
   async insert(v, row) {
     if (DEMO) { const a = await api.list(v); a.unshift(row);
@@ -536,9 +745,10 @@ function renderStats() {
 function visible() {
   const q = query.trim().toLowerCase();
   const f = view.filters.find(x => x.key === filter) || view.filters[0];
-  // `days` and `photo` are drawn, not stored — searching them would compare
-  // against undefined on every row.
-  const keys = view.cols.map(c => c.key).filter(k => k !== "days" && k !== "photo");
+  // Some columns are drawn, not stored (photo, days, everything computed in
+  // the Stock tab) — searching them would compare against undefined on every row.
+  const keys = view.cols.filter(c => !c.kind || c.kind === "status" || c.kind === "switch")
+                        .map(c => c.key);
   return rows.filter(r => {
     if (!f.fn(r)) return false;
     if (!q) return true;
@@ -652,6 +862,70 @@ function openPhoto(name, sku) {
   $("#lb").classList.add("on");
 }
 
+/* Typing a number here means "I have just counted, there are this many" —
+   so it is stored as a fresh count dated today, and everything sold from
+   today on is taken off it again. */
+function stockCell(r) {
+  const info = stkInfo(r);
+  const box = document.createElement("span");
+  box.className = "stk " + info.colour;
+  const dot = document.createElement("i");
+  const el = document.createElement("input");
+  el.type = "number";
+  el.className = "mono";
+  el.placeholder = "—";
+  el.value = info.counted ? info.left : "";
+  el.title = info.counted
+    ? `counted ${info.base} on ${info.baseDate || "—"}`
+    : "not counted yet — type how many are on the shelf";
+  el.addEventListener("focus", () => { editing = r.id + ":instock"; });
+  el.addEventListener("blur",  () => { if (editing === r.id + ":instock") editing = null; });
+  el.addEventListener("change", () => {
+    const v = el.value === "" ? null : Number(el.value);
+    save(r.id, "baseline_qty", v, { baseline_date: v == null ? null : today() });
+  });
+  box.append(dot, el);
+  return box;
+}
+
+/* A new count changes the colour and every computed column in that row. We
+   repaint just those cells instead of the whole table, so the cursor stays
+   where it is — counting 600 products means tabbing straight down the list. */
+function refreshStock(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  const r = rows.find(x => x.id === id);
+  if (!tr || !r) return;
+  const info = stkInfo(r);
+  const box = tr.querySelector(".c-instock .stk");
+  if (box) box.className = "stk " + info.colour;
+  for (const col of view.cols) {
+    if (col.kind !== "calc") continue;
+    const td = tr.querySelector(".c-" + col.key);
+    if (td) { td.innerHTML = ""; td.appendChild(calcCell(r, col)); }
+  }
+}
+
+function calcCell(r, col) {
+  const info = stkInfo(r);
+  const b = document.createElement("b");
+  const v = col.pick(info);
+  b.textContent = v === "" || v == null ? "—" : v;
+  if (v === "" || v == null) b.className = "muted-cell";
+  if (col.key === "left" && info.counted) {
+    if (info.colour === "red") b.className = "red";
+    else if (info.colour === "orange") b.className = "orange";
+  }
+  if (col.key === "s7" && info.hot) {
+    const t = document.createElement("span"); t.className = "tag"; t.textContent = "🔥";
+    const w = document.createElement("span"); w.append(b, t); return w;
+  }
+  if (col.key === "s30" && info.dead) {
+    const t = document.createElement("span"); t.className = "tag"; t.textContent = "💤";
+    const w = document.createElement("span"); w.append(b, t); return w;
+  }
+  return b;
+}
+
 function daysCell(r) {
   const span = document.createElement("span");
   const n = daysSince(r.order_date);
@@ -679,6 +953,8 @@ function render() {
       else if (col.kind === "switch") td.appendChild(switchCell(r, col.key));
       else if (col.kind === "photo")  td.appendChild(photoCell(r));
       else if (col.kind === "days")   td.appendChild(daysCell(r));
+      else if (col.kind === "stock")  td.appendChild(stockCell(r));
+      else if (col.kind === "calc")   td.appendChild(calcCell(r, col));
       else                            td.appendChild(cellInput(r, col));
       tr.appendChild(td);
     }
@@ -703,9 +979,9 @@ function flash(id) {
 }
 
 /* ---------------- writes ---------------- */
-async function save(id, field, value) {
+async function save(id, field, value, extra) {
   const row = rows.find(r => r.id === id);
-  const patch = { [field]: value };
+  const patch = Object.assign({ [field]: value }, extra || {});
 
   // Stamp the day the work was finished the first time it is marked shipped or
   // delivered — otherwise the weekly numbers would only know when an order came in.
@@ -719,6 +995,8 @@ async function save(id, field, value) {
   const p = pending.get(id) || {};
   Object.assign(p, patch);
   pending.set(id, p);
+  stkVer++;                             // a new count changes every computed column
+  if (view.stock) refreshStock(id);
   renderStats();
   renderPanel();
   const v = view;                       // remember the tab the edit belongs to
@@ -871,9 +1149,11 @@ function switchView(key) {
   editing = null;
   filter = view.filters[0].key;
   $("#q").placeholder = view.search;
+  $("#add").textContent = view.addLabel || "+ New order";
   renderTabs(); renderHead(); renderChips(); render();
   setSync("busy", "loading…");
   sync();
+  stkSync();
 }
 
 /* ---------------- polling ---------------- */
@@ -897,6 +1177,7 @@ async function sync() {
     const sameCount = fresh.length === rows.length;
 
     rows = fresh;
+    stkVer++;
     counts[viewKey] = fresh.length;
     // re-rendering steals focus, so skip it while someone is typing in a cell
     if (!editing) {
@@ -910,6 +1191,20 @@ async function sync() {
   } catch (e) {
     setSync("off", "offline — retrying");
   }
+}
+
+// Sales and orders behind the computed columns — only while the Stock tab is
+// open, and on a slower clock than the rows themselves.
+async function stkSync() {
+  if (!view.stock) return;
+  try {
+    const d = await api.stockData();
+    stkSales = d.sales;
+    stkOrders = d.orders;
+    stkDays = new Set((d.days || []).map(x => String(x.scan_date).slice(0, 10)));
+    stkVer++;
+    if (!editing) render();
+  } catch (e) { /* rows still show; the computed columns just stay stale */ }
 }
 
 // the other tabs' counters, so the labels are honest without opening them
@@ -954,11 +1249,14 @@ document.addEventListener("keydown", e => {
 });
 
 $("#q").placeholder = view.search;
+$("#add").textContent = view.addLabel || "+ New order";
 renderTabs(); renderHead(); renderChips(); render();
 sync();
+stkSync();
 syncCounts();
 setInterval(sync, POLL_MS);
 setInterval(syncCounts, POLL_MS * 5);
+setInterval(stkSync, 60000);
 </script>
 </body>
 </html>
