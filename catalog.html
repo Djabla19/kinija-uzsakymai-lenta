@@ -37,6 +37,9 @@
   .chip { border:1px solid var(--line); background:var(--card); color:var(--muted);
           border-radius:20px; padding:6px 13px; font-size:13px; cursor:pointer; }
   .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  /* The brand switch is a bigger decision than a filter — it changes which
+     catalogue you are looking at, so it reads heavier than the chips below. */
+  #brandchips .chip { font-weight:600; padding:8px 15px; font-size:14px; }
   .chip u { font-style:normal; text-decoration:none; opacity:.7; margin-left:5px; }
 
   /* ---- grid ----
@@ -111,6 +114,9 @@
     </div>
   </div>
 
+  <div class="bar" id="brandbar" hidden>
+    <div class="chips" id="brandchips"></div>
+  </div>
   <div class="bar">
     <input type="search" id="q" placeholder="Search SKU…" autocomplete="off">
     <div class="chips" id="chips"></div>
@@ -143,9 +149,19 @@ const TIPAI = {
   necklaces: "Necklaces",
   bracelets: "Bracelets",
   rings: "Rings",
+  safety: "Safety chains",
   other: "Other",
 };
-const EILE = ["charms", "earrings", "necklaces", "bracelets", "rings", "other"];
+const EILE = ["charms", "earrings", "necklaces", "bracelets", "rings", "safety", "other"];
+
+/* Two catalogues, not one list with a filter: Pandora is a different supplier
+   and its range is larger than our own, so mixing them would make "Charms"
+   mean two different things at once. The switch decides which catalogue is on
+   screen; every count, chip and search below works inside that one only. */
+const BRANDAI = [
+  ["sava",    "Our products", p => p.k !== "pandora"],
+  ["pandora", "Pandora",      p => p.k === "pandora"],
+];
 
 /* Stock travels inside this file too — a number and a colour written in at
    publish time, refreshed every night. There is still no database key here:
@@ -182,8 +198,11 @@ function zenklasEl(p) {
 }
 
 const $ = s => document.querySelector(s);
-const items = DATA.produktai || [];
-const turimStock = items.some(p => (p.c && p.c !== "n") || p.t);
+const visosPrekes = DATA.produktai || [];
+const turimStock = visosPrekes.some(p => (p.c && p.c !== "n") || p.t);
+let brand = BRANDAI[0][0];
+const grupe = () => (BRANDAI.find(b => b[0] === brand) || BRANDAI[0])[2];
+let items = visosPrekes.filter(grupe());
 let kat = "all";
 let stockFilter = "all";
 let query = "";
@@ -265,6 +284,30 @@ function renderStockChips() {
   }
 }
 
+function renderBrandChips() {
+  const box = $("#brandchips");
+  box.innerHTML = "";
+  const rodyti = BRANDAI.filter(([, , fn]) => visosPrekes.some(fn));
+  $("#brandbar").hidden = rodyti.length < 2;   // vienas tiekėjas — nėra ką perjungti
+  for (const [key, label, fn] of rodyti) {
+    const s = document.createElement("span");
+    s.className = "chip" + (brand === key ? " on" : "");
+    s.textContent = label;
+    const u = document.createElement("u");
+    u.textContent = visosPrekes.filter(fn).length;
+    s.appendChild(u);
+    s.addEventListener("click", () => {
+      if (brand === key) return;
+      brand = key;
+      items = visosPrekes.filter(grupe());
+      kat = "all";              // tipai kiekviename kataloge savi
+      stockFilter = "all";
+      renderBrandChips(); renderStockChips(); renderChips(); render();
+    });
+    box.appendChild(s);
+  }
+}
+
 function renderChips() {
   const counts = {};
   for (const p of items) counts[p.tipas] = (counts[p.tipas] || 0) + 1;
@@ -339,6 +382,7 @@ document.addEventListener("keydown", e => {
 });
 $("#q").addEventListener("input", e => { query = e.target.value; render(); });
 
+renderBrandChips();
 renderChips();
 renderStockChips();
 render();
