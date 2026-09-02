@@ -405,6 +405,11 @@ function bulkView(label, category, opts) {
 const STK = { trip:14, red:14, amber:28, cover:60, window:30, dead:60, round:10 };
 
 let stkSales = [], stkOrders = [], stkDays = new Set();
+
+// Set to false as soon as the database turns out not to have received_date yet
+// (setup-gavimo-data.sql not run). Writing to a column that does not exist
+// would make an ordinary status change fail to save.
+let HAS_RECEIVED_DATE = true;
 let stkVer = 0, stkMemo = new Map(), stkMemoVer = -1;
 const STK_NONE = { counted:false, left:0, s7:0, s30:0, perDay:0, perWeek:0,
                    left_days:null, incoming:0, hot:false, dead:false, colour:"grey", suggest:0 };
@@ -443,7 +448,10 @@ function stkRebuild() {
     const q = +o.qty || 0;
     if (o.status === "received") {
       if (!arrived.has(t)) arrived.set(t, []);
-      arrived.get(t).push([String(o.order_date || "").slice(0, 10), q]);
+      // The day the box actually landed. Without received_date we cannot know,
+      // and a shipment of unknown age was already on the shelf when counted —
+      // so it must not be added again.
+      arrived.get(t).push([String(o.received_date || "").slice(0, 10), q]);
     } else if (o.status !== "problem") {
       incoming.set(t, (incoming.get(t) || 0) + q);
     }
@@ -667,7 +675,11 @@ const api = {
     const from = daysAgo(400);
     const [sales, orders, days] = await Promise.all([
       api.page(`sales?select=sold_date,sku,qty&sold_date=gte.${from}&order=sold_date.asc,sku.asc`),
-      api.page(`orders?select=sku,qty,status,order_date&order=id.asc`),
+      // received_date exists only after setup-gavimo-data.sql has been run. Fall
+      // back to the old shape rather than leaving the whole tab blank.
+      api.page(`orders?select=sku,qty,status,order_date,received_date&order=id.asc`)
+         .catch(() => { HAS_RECEIVED_DATE = false;
+                        return api.page(`orders?select=sku,qty,status,order_date&order=id.asc`); }),
       api.page(`sales_scan?select=scan_date&scan_date=gte.${daysAgo(40)}&order=scan_date.desc`),
     ]);
     return { sales, orders, days };
@@ -1058,6 +1070,11 @@ async function save(id, field, value, extra) {
     patch.done_date = today();
   }
 
+  // Stock counts the day a shipment landed, not the day it was ordered.
+  if (field === "status" && !view.analytics && HAS_RECEIVED_DATE) {
+    patch.received_date = value === "received" ? (row && row.received_date) || today() : null;
+  }
+
   if (row) Object.assign(row, patch);
   const p = pending.get(id) || {};
   Object.assign(p, patch);
@@ -1077,6 +1094,18 @@ async function save(id, field, value, extra) {
     }
     setSync("", "saved · live");
   } catch (e) {
+    // The one failure we can repair ourselves: writing received_date before
+    // setup-gavimo-data.sql has been run. Drop the field and save the rest.
+    if ("received_date" in patch) {
+      HAS_RECEIVED_DATE = false;
+      delete patch.received_date;
+      try {
+        await api.patch(v, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
+        pending.delete(id);
+        setSync("", "saved · live");
+        return;
+      } catch (e2) { /* fall through to the honest message below */ }
+    }
     setSync("off", "not saved — check connection, then retype");
   }
 }
