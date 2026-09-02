@@ -392,7 +392,7 @@ function bulkView(label, category, opts) {
 
    The number in this tab is never stored — it is worked out every time:
 
-       in stock = counted + arrived from China - sold since the count
+       in stock = counted (raised by "+ Arrived") - sold since the count
 
    "Counted" is a number with a date on it, and selling is read out of the
    shipping labels that land in the mailbox every day. Keeping a running
@@ -436,7 +436,7 @@ function daysAgo(n) { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.get
 function stkRebuild() {
   stkMemo = new Map();
   const m = stockMap(rows);
-  const sold = new Map(), incoming = new Map(), arrived = new Map();
+  const sold = new Map(), incoming = new Map();
 
   for (const s of stkSales) {
     const t = stockMatch(s.sku, m); if (!t) continue;
@@ -446,13 +446,9 @@ function stkRebuild() {
   for (const o of stkOrders) {
     const t = stockMatch(o.sku, m); if (!t) continue;
     const q = +o.qty || 0;
-    if (o.status === "received") {
-      if (!arrived.has(t)) arrived.set(t, []);
-      // The day the box actually landed. Without received_date we cannot know,
-      // and a shipment of unknown age was already on the shelf when counted —
-      // so it must not be added again.
-      arrived.get(t).push([String(o.received_date || "").slice(0, 10), q]);
-    } else if (o.status !== "problem") {
+    // A received box no longer moves the count — the warehouse enters what it
+    // unpacks in "+ Arrived". Marking it received only takes it off "on order".
+    if (o.status !== "received" && o.status !== "problem") {
       incoming.set(t, (incoming.get(t) || 0) + q);
     }
   }
@@ -478,7 +474,10 @@ function stkRebuild() {
     const base = +r.baseline_qty || 0;
     const from = String(r.baseline_date || "").slice(0, 10);
     const left = (counted && from)
-      ? base - sumAfter(list, from, now) + sumAfter(arrived.get(r.sku), from, now)
+      // Arrivals are entered by the warehouse in the "+ Arrived" column, which
+      // raises the count directly. Adding them a second time from the orders
+      // board would double every box that gets marked "received" a day later.
+      ? base - sumAfter(list, from, now)
       : base;
 
     const s7 = sum(list, daysAgo(7), now);
