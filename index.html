@@ -55,8 +55,10 @@
 
   /* ---- tabs ---- */
   .tabs[hidden] { display:none; }   /* `display:flex` below would out-argue `hidden` */
+  /* Astuoni skirtukai i viena eilute nebetelpa. Slinkimas be jokio zenklo
+     reiskia, kad paskutinio niekas neranda — todel keliam i kita eilute. */
   .tabs { display:flex; gap:4px; margin:22px 0 0; border-bottom:1px solid var(--line);
-          overflow-x:auto; }
+          flex-wrap:wrap; }
   .tab { border:0; background:transparent; color:var(--muted); font-size:15px; font-weight:600;
          white-space:nowrap;
          padding:10px 16px; border-radius:10px 10px 0 0; border-bottom:2px solid transparent;
