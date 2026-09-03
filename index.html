@@ -33,6 +33,14 @@
   .pulse.off { background:var(--s-problem); }
   .pulse.busy { background:var(--s-production); }
   .stats { display:flex; gap:20px; flex-wrap:wrap; }
+  /* Winners & Losers */
+  td.c-shops, .c-shops { font-size:12px; color:#555; max-width:260px; }
+  .state { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; white-space:nowrap; }
+  .s-up    { background:#e6f4ea; color:#1e6b33; }
+  .s-down  { background:#fdecea; color:#a3231a; }
+  .s-never { background:#f1f1f1; color:#666; }
+  .s-flat  { background:#eef2f7; color:#456; }
+  b.green  { color:#1e6b33; }
   /* Juosta apie ka tik suskaiciuotas prekes. Reikalinga todel, kad numatytas
      filtras yra "Order now", o ka tik suskaiciuota preke beveik visada zalia —
      be sitos juostos sandelio darbuotojo darbo atsidarius nesimato is viso. */
@@ -538,6 +546,114 @@ function stkInfo(r) {
   return stkMemo.get(r.id) || STK_NONE;
 }
 
+/* ---------------- Winners & Losers ----------------
+   Kuris gaminys kyla, kuris krenta ir kurio niekada nepardavem. Skaiciuojam
+   is tu paciu 400 dienu pardavimu, kuriuos jau parsisiuncia Stock skirtukas —
+   antro krovimo nereikia. Kategorija ir parduotuves ateina is `product_meta`.  */
+const WIN_MEN = 6;          // kiek menesiu rodom
+const WIN_LANGAS = 3;       // per kiek menesiu lyginam tendencija
+
+let winMemo = new Map(), winMemoVer = -1, winVer = 0;
+let metaBySku = new Map();
+
+function menuo(d) { return d.toISOString().slice(0, 7); }
+
+function paskutiniai(n) {
+  const out = [], t = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    out.push(menuo(new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - i, 1))));
+  }
+  return out;
+}
+
+function winRebuild() {
+  winMemo = new Map();
+  const m = stockMap(rows);
+  const pagal = new Map();
+  for (const s of stkSales) {
+    const t = stockMatch(s.sku, m); if (!t) continue;
+    const key = String(s.sold_date).slice(0, 7);
+    if (!pagal.has(t)) pagal.set(t, new Map());
+    const mm = pagal.get(t);
+    mm.set(key, (mm.get(key) || 0) + (+s.qty || 0));
+  }
+  const men = paskutiniai(WIN_MEN);
+  for (const r of rows) {
+    const mm = pagal.get(r.sku) || new Map();
+    const eil = men.map(k => mm.get(k) || 0);
+    // Dabartinis menuo dar nepilnas, todel i tendencija jo neimam — kitaip
+    // kiekvienas produktas menesio pradzioje atrodytu krentantis.
+    const uzdaryti = eil.slice(0, eil.length - 1);
+    const naujausi = uzdaryti.slice(-WIN_LANGAS).reduce((a, b) => a + b, 0);
+    const seni = uzdaryti.slice(-WIN_LANGAS * 2, -WIN_LANGAS).reduce((a, b) => a + b, 0);
+    let bukle;
+    if (eil.reduce((a, b) => a + b, 0) === 0) bukle = "never";
+    else if (seni >= 3 && naujausi < seni * 0.6) bukle = "down";
+    else if (naujausi >= 3 && naujausi > seni * 1.4) bukle = "up";
+    else bukle = "flat";
+    const meta = metaBySku.get(r.sku) || {};
+    winMemo.set(r.id, {
+      men, eil, naujausi, seni, bukle,
+      pokytis: seni ? Math.round((naujausi - seni) / seni * 100) : (naujausi ? 100 : 0),
+      category: meta.category || "", shops: meta.shops || "",
+    });
+  }
+}
+
+const WIN_NONE = { men: [], eil: [], naujausi: 0, seni: 0, bukle: "never",
+                   pokytis: 0, category: "", shops: "" };
+
+function winInfo(r) {
+  if (winMemoVer !== stkVer + winVer) { winRebuild(); winMemoVer = stkVer + winVer; }
+  return winMemo.get(r.id) || WIN_NONE;
+}
+
+function winnersView() {
+  const men = paskutiniai(WIN_MEN);
+  const trumpai = k => ["Jan","Feb","Mar","Apr","May","Jun",
+                        "Jul","Aug","Sep","Oct","Nov","Dec"][+k.slice(5, 7) - 1];
+  return {
+    label: "Winners & Losers",
+    table: "stock",
+    stock: true,          // naudoja tuos pacius pardavimu duomenis
+    winners: true,
+    readonly: true,       // cia nieko neredaguojam — tik ziurim
+    order: "sku.asc",
+    search: "Search SKU or shop…",
+    cols: [
+      { key: "photo", label: "", kind: "photo" },
+      { key: "sku", label: "SKU", kind: "win", cls: "mono", pick: (i, r) => r.sku },
+      { key: "wcat", label: "Type", kind: "win", pick: i => i.category || "" },
+      ...men.map((k, idx) => ({
+        key: "m" + idx, label: trumpai(k), kind: "win", cls: "n",
+        pick: i => i.eil[idx] || "",
+      })),
+      { key: "wtrend", label: "3 mo", kind: "win", cls: "n",
+        // Rodykle pasakoma krypti anksciau, nei perskaitomas skaicius —
+        // per 1400 eiluciu tai skiriasi labai.
+        pick: i => i.bukle === "never" ? ""
+          : (i.pokytis > 0 ? "▲ +" : i.pokytis < 0 ? "▼ " : "= ") + i.pokytis + "%" },
+      { key: "wstate", label: "Status", kind: "winstate" },
+      { key: "shops", label: "Listed in", kind: "win", cls: "shops", pick: i => i.shops || "" },
+    ],
+    blank: () => ({}),
+    done: () => false,
+    stats: [
+      { label: "Products", fn: () => true },
+      { label: "Falling", fn: r => winInfo(r).bukle === "down" },
+      { label: "Rising", fn: r => winInfo(r).bukle === "up" },
+      { label: "Never sold", fn: r => winInfo(r).bukle === "never" },
+    ],
+    filters: [
+      { key: "down", label: "Falling", fn: r => winInfo(r).bukle === "down" },
+      { key: "up", label: "Rising", fn: r => winInfo(r).bukle === "up" },
+      { key: "never", label: "Never sold", fn: r => winInfo(r).bukle === "never" },
+      { key: "sold", label: "Sold at all", fn: r => winInfo(r).bukle !== "never" },
+      { key: "all", label: "All", fn: () => true },
+    ],
+  };
+}
+
 function stockView() {
   const num = (label, key, pick, cls) => ({
     key, label, kind:"calc", cls, pick,
@@ -595,6 +711,7 @@ const VIEWS = {
   bd:      bulkView("B/D Modian Silver Sterling", "bd",   { ship:true }),
   ac:      bulkView("A/C Modian Silver Sterling", "ac",   { ship:true }),
   stock:   stockView(),
+  winners: winnersView(),
 
   personalised: {
     label: "Personalised",
@@ -1002,6 +1119,38 @@ function addCell(r) {
   return el;
 }
 
+// Winners & Losers langeliai. Atskirai nuo calcCell, nes tas visada imtu
+// stkInfo — cia reikia menesiu eilutes, ne likuciu.
+function winCell(r, col) {
+  const info = winInfo(r);
+  const b = document.createElement("b");
+  const v = col.pick(info, r);
+  b.textContent = v === "" || v == null ? "—" : v;
+  if (v === "" || v == null) b.className = "muted-cell";
+  if (col.key === "wtrend" && info.bukle !== "never") {
+    b.className = info.pokytis < 0 ? "red" : (info.pokytis > 0 ? "green" : "");
+  }
+  // Menesio langelis nusidazo pagal tai, ar jis didesnis uz praeita — taip
+  // eilute perskaitoma is karto, be lyginimo akimis.
+  if (col.key.startsWith("m") && col.key.length <= 2) {
+    const i = +col.key.slice(1);
+    if (i > 0 && info.eil[i] !== undefined) {
+      if (info.eil[i] > info.eil[i - 1]) b.className = "green";
+      else if (info.eil[i] < info.eil[i - 1]) b.className = "red";
+    }
+  }
+  return b;
+}
+
+function winStateCell(r) {
+  const info = winInfo(r);
+  const s = document.createElement("span");
+  s.className = "state s-" + info.bukle;
+  s.textContent = { up: "▲ Rising", down: "▼ Falling",
+                    never: "○ Never sold", flat: "= Steady" }[info.bukle];
+  return s;
+}
+
 function calcCell(r, col) {
   const info = stkInfo(r);
   const b = document.createElement("b");
@@ -1087,6 +1236,8 @@ function render() {
       else if (col.kind === "days")   td.appendChild(daysCell(r));
       else if (col.kind === "stock")  td.appendChild(stockCell(r));
       else if (col.kind === "add")    td.appendChild(addCell(r));
+      else if (col.kind === "win")    td.appendChild(winCell(r, col));
+      else if (col.kind === "winstate") td.appendChild(winStateCell(r));
       else if (col.kind === "calc")   td.appendChild(calcCell(r, col));
       else                            td.appendChild(cellInput(r, col));
       tr.appendChild(td);
@@ -1096,7 +1247,8 @@ function render() {
     tdDel.className = "c-del"; tdDel.dataset.l = "";
     // A narrowed-down page is someone else's workplace: they add and count,
     // they do not remove products from the list.
-    if (!ONLY.length) {
+    // Winners & Losers yra ataskaita, ne darbo lentele — trinti ten nera ko.
+    if (!ONLY.length && !view.readonly) {
       const del = document.createElement("button");
       del.className = "del"; del.title = "Delete"; del.textContent = "✕";
       del.addEventListener("click", () => removeRow(r));
@@ -1316,10 +1468,12 @@ function switchView(key) {
     : view.filters[0]).key;
   $("#q").placeholder = view.search;
   $("#add").textContent = view.addLabel || "+ New order";
+  $("#add").hidden = !!view.readonly;
   renderTabs(); renderHead(); renderChips(); render();
   setSync("busy", "loading…");
   sync();
   stkSync();
+  metaSync();
 }
 
 /* ---------------- polling ---------------- */
@@ -1361,6 +1515,18 @@ async function sync() {
 
 // Sales and orders behind the computed columns — only while the Stock tab is
 // open, and on a slower clock than the rows themselves.
+// Kategorija ir parduotuves. Keiciasi retai (po naujo listingo), todel
+// siunciamos su savo laikrodziu, o ne kas 4 sek. su eilutemis.
+async function metaSync() {
+  if (!view.winners || DEMO) return;
+  try {
+    const r = await api.page("product_meta?select=sku,category,shops&order=sku.asc");
+    metaBySku = new Map(r.map(x => [x.sku, x]));
+    winVer++;
+    if (!editing) render();
+  } catch (e) { /* skirtukas veikia ir be ju — stulpeliai lieka tusti */ }
+}
+
 async function stkSync() {
   if (!view.stock) return;
   try {
@@ -1416,6 +1582,7 @@ document.addEventListener("keydown", e => {
 
 $("#q").placeholder = view.search;
 $("#add").textContent = view.addLabel || "+ New order";
+$("#add").hidden = !!view.readonly;
 if (ONLY.length === 1) {
   document.querySelector("h1").textContent = view.label === "Stock" ? "Warehouse stock" : view.label;
   document.title = document.querySelector("h1").textContent;
@@ -1423,6 +1590,7 @@ if (ONLY.length === 1) {
 renderTabs(); renderHead(); renderChips(); render();
 sync();
 stkSync();
+metaSync();
 syncCounts();
 setInterval(sync, POLL_MS);
 setInterval(syncCounts, POLL_MS * 5);
