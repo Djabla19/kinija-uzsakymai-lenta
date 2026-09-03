@@ -33,6 +33,15 @@
   .pulse.off { background:var(--s-problem); }
   .pulse.busy { background:var(--s-production); }
   .stats { display:flex; gap:20px; flex-wrap:wrap; }
+  /* Juosta apie ka tik suskaiciuotas prekes. Reikalinga todel, kad numatytas
+     filtras yra "Order now", o ka tik suskaiciuota preke beveik visada zalia —
+     be sitos juostos sandelio darbuotojo darbo atsidarius nesimato is viso. */
+  .counted { margin:0 0 10px; padding:10px 14px; border-radius:8px;
+             background:#eef7ee; border:1px solid #cfe3cf; color:#2c5d2c;
+             display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:14px; }
+  .counted b { font-weight:600; }
+  .counted .link-btn { color:#2c5d2c; text-decoration:underline; cursor:pointer;
+                       background:none; border:0; padding:0; font:inherit; }
   .stat b { display:block; font-size:21px; line-height:1.1; }
   .stat span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.6px; }
 
@@ -274,6 +283,8 @@
       <tbody id="breakdown"></tbody>
     </table>
   </div>
+
+  <div class="counted" id="counted" hidden></div>
 
   <div class="tablewrap">
     <table>
@@ -1020,7 +1031,42 @@ function daysCell(r) {
   return span;
 }
 
+// Juosta "ka tik suskaiciuota". Rodoma nepriklausomai nuo filtro, todel
+// atsidarius Stock skirtuka is karto matyti, ar sandelio darbuotojo darbas
+// atejo — anksciau jo suvestos prekes tyliai iskrisdavo is "Order now".
+function renderCounted() {
+  const box = $("#counted");
+  if (!view.stock) { box.hidden = true; return; }
+
+  const nauji = rows.filter(stkJustCounted);
+  if (!nauji.length) { box.hidden = true; return; }
+
+  const siandien = new Date().toISOString().slice(0, 10);
+  const dabar = nauji.filter(r => (r.baseline_date || "").slice(0, 10) === siandien);
+  const vnt = d => d.reduce((s, r) => s + (Number(r.baseline_qty) || 0), 0);
+
+  box.innerHTML = "";
+  const t = document.createElement("span");
+  t.innerHTML = dabar.length
+    ? `✅ Counted <b>today</b>: ${dabar.length} products, ${vnt(dabar)} pcs.`
+      + (nauji.length > dabar.length
+         ? ` Earlier this week: ${nauji.length - dabar.length} more.` : "")
+    : `✅ Counted in the last ${STK_NAUJAI_D} days: <b>${nauji.length}</b> products, ${vnt(nauji)} pcs.`;
+  box.appendChild(t);
+
+  const b = document.createElement("button");
+  b.className = "link-btn";
+  b.textContent = filter === "just" ? "show all" : "show them";
+  b.addEventListener("click", () => {
+    filter = filter === "just" ? "low" : "just";
+    renderChips(); render();
+  });
+  box.appendChild(b);
+  box.hidden = false;
+}
+
 function render() {
+  renderCounted();
   const list = visible();
   const tb = $("#rows");
   tb.innerHTML = "";
