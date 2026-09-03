@@ -550,8 +550,11 @@ function stkInfo(r) {
    Kuris gaminys kyla, kuris krenta ir kurio niekada nepardavem. Skaiciuojam
    is tu paciu 400 dienu pardavimu, kuriuos jau parsisiuncia Stock skirtukas —
    antro krovimo nereikia. Kategorija ir parduotuves ateina is `product_meta`.  */
-const WIN_MEN = 6;          // kiek menesiu rodom
-const WIN_LANGAS = 3;       // per kiek menesiu lyginam tendencija
+// Viskas skaiciuojama is TRIJU paskutiniu uzdarytu menesiu (savininko
+// sprendimas 2026-09-03). Ketvirtas stulpelis — einamasis menuo: ji rodom,
+// bet i tendencija neimam, nes jis dar nepilnas ir kiekvienas produktas
+// menesio pradzioje atrodytu krentantis.
+const WIN_MEN = 4;
 
 let winMemo = new Map(), winMemoVer = -1, winVer = 0;
 let metaBySku = new Map();
@@ -583,9 +586,10 @@ function winRebuild() {
     const eil = men.map(k => mm.get(k) || 0);
     // Dabartinis menuo dar nepilnas, todel i tendencija jo neimam — kitaip
     // kiekvienas produktas menesio pradzioje atrodytu krentantis.
+    // Trys uzdaryti menesiai: lyginam paskutini su pirmuoju.
     const uzdaryti = eil.slice(0, eil.length - 1);
-    const naujausi = uzdaryti.slice(-WIN_LANGAS).reduce((a, b) => a + b, 0);
-    const seni = uzdaryti.slice(-WIN_LANGAS * 2, -WIN_LANGAS).reduce((a, b) => a + b, 0);
+    const seni = uzdaryti[0] || 0;                       // pirmas is triju
+    const naujausi = uzdaryti[uzdaryti.length - 1] || 0; // paskutinis uzdarytas
     let bukle;
     if (eil.reduce((a, b) => a + b, 0) === 0) bukle = "never";
     else if (seni >= 3 && naujausi < seni * 0.6) bukle = "down";
