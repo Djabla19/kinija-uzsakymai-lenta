@@ -511,6 +511,17 @@ function stkRebuild() {
   }
 }
 
+// Kada suskaiciuota "neseniai". Sandelio darbuotojo suvestos prekes beveik
+// visada yra zalios, o numatytas filtras rodo tik "Order now" — be sito
+// atrodo, kad jo darbas dingo.
+const STK_NAUJAI_D = 7;
+function stkJustCounted(r) {
+  const d = (r.baseline_date || "").slice(0, 10);
+  if (!d) return false;
+  const dienos = (Date.now() - Date.parse(d + "T00:00:00Z")) / 86400000;
+  return dienos >= 0 && dienos <= STK_NAUJAI_D;
+}
+
 function stkInfo(r) {
   if (stkMemoVer !== stkVer) { stkRebuild(); stkMemoVer = stkVer; }
   return stkMemo.get(r.id) || STK_NONE;
@@ -552,9 +563,11 @@ function stockView() {
       { label:"Order now", fn: r => stkInfo(r).colour === "orange" || (stkInfo(r).colour === "red" && stkInfo(r).left > 0) },
       { label:"Out",       fn: r => stkInfo(r).counted && stkInfo(r).left <= 0 },
       { label:"Selling fast", fn: r => stkInfo(r).hot },
+      { label:"Just counted", fn: stkJustCounted },
     ],
     filters: [
       { key:"low",     label:"Order now", fn: r => ["red","orange"].includes(stkInfo(r).colour) },
+      { key:"just",    label:"Just counted", fn: stkJustCounted },
       { key:"all",     label:"All",       fn: () => true },
       { key:"out",     label:"Out",       fn: r => stkInfo(r).counted && stkInfo(r).left <= 0 },
       { key:"hot",     label:"Selling fast", fn: r => stkInfo(r).hot },
