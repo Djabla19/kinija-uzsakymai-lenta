@@ -4,25 +4,35 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>China Orders — Live Board</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
 <style>
   :root {
-    --bg:#eef1f5; --card:#fff; --ink:#1f2733; --muted:#8a94a6; --line:#e7ebf1;
-    --accent:#4f6bed; --accent-soft:#eaeeff;
-    --s-ordered:#8a94a6; --s-production:#f5a623; --s-ready:#8e6bd8;
-    --s-shipped:#4f6bed; --s-received:#2ecc71; --s-problem:#e5484d;
-    --flash:#fff6d5;
+    --bg:#F4F3EF; --card:#FFFFFF; --ink:#1B1E22; --muted:#6C737E; --line:#E4E2DB; --shade:#F8F7F4;
+    --accent:#167C6C; --accent-soft:#E2F1ED;
+    --s-ordered:#6C737E; --s-production:#D9822B; --s-ready:#4C6FB0;
+    --s-shipped:#167C6C; --s-received:#2A9D6B; --s-problem:#D14343;
+    --s-ordered-soft:#F8F7F4; --s-production-soft:#FBEEDD; --s-ready-soft:#E6ECF7;
+    --s-shipped-soft:#E2F1ED; --s-received-soft:#E3F5EC; --s-problem-soft:#FBE5E5;
+    --flash:#FFF3CF;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#12161c; --card:#1a1f27; --ink:#e7ecf3; --muted:#8d97a8;
-            --line:#262d38; --accent:#7b90ff; --accent-soft:#232a3d; --flash:#3a3319; }
+    :root { --bg:#15181C; --card:#1D2126; --ink:#E8E9E5; --muted:#8E949E; --line:#2C3138; --shade:#1A1E23;
+            --accent:#43B79E; --accent-soft:#1D3A34;
+            --s-ordered:#8E949E; --s-production:#E8A050; --s-ready:#7C9BE0;
+            --s-shipped:#43B79E; --s-received:#4CC28A; --s-problem:#EE6B6B;
+            --s-ordered-soft:#1A1E23; --s-production-soft:#3A2B18; --s-ready-soft:#1F2A40;
+            --s-shipped-soft:#1D3A34; --s-received-soft:#1B3328; --s-problem-soft:#3B2022;
+            --flash:#3a3319; }
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { margin:0; }
   body {
     background:var(--bg); color:var(--ink); font-size:15px; line-height:1.4;
-    font-family:-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif;
+    font-family:Manrope,-apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
     padding:20px 16px 90px;
   }
+  ::placeholder { color:var(--muted); opacity:.45; }
   .wrap { max-width:1800px; margin:0 auto; }
 
   /* ---- header ---- */
@@ -36,6 +46,7 @@
   /* Juosta apie ka tik suskaiciuotas prekes. Reikalinga todel, kad numatytas
      filtras yra "Order now", o ka tik suskaiciuota preke beveik visada zalia —
      be sitos juostos sandelio darbuotojo darbo atsidarius nesimato is viso. */
+  .counted[hidden] { display:none; }   /* `display:flex` below would out-argue `hidden` */
   .counted { margin:0 0 10px; padding:10px 14px; border-radius:8px;
              background:#eef7ee; border:1px solid #cfe3cf; color:#2c5d2c;
              display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:14px; }
@@ -47,15 +58,14 @@
 
   /* ---- tabs ---- */
   .tabs[hidden] { display:none; }   /* `display:flex` below would out-argue `hidden` */
-  .tabs { display:flex; gap:4px; margin:22px 0 0; border-bottom:1px solid var(--line);
-          overflow-x:auto; }
-  .tab { border:0; background:transparent; color:var(--muted); font-size:15px; font-weight:600;
-         white-space:nowrap;
-         padding:10px 16px; border-radius:10px 10px 0 0; border-bottom:2px solid transparent;
-         margin-bottom:-1px; cursor:pointer; }
+  .tabs { display:flex; gap:2px; margin:18px 0 0; background:var(--shade); border:1px solid var(--line);
+          border-radius:11px; padding:3px; overflow-x:auto; width:max-content; max-width:100%; }
+  .tab { border:0; background:transparent; color:var(--muted); font-size:14px; font-weight:600;
+         white-space:nowrap; padding:8px 14px; border-radius:8px; cursor:pointer; }
   .tab:hover { color:var(--ink); }
-  .tab.on { color:var(--accent); border-bottom-color:var(--accent); background:var(--card); }
-  .tab u { font-style:normal; text-decoration:none; font-weight:500; opacity:.65; margin-left:6px; }
+  .tab.on { color:var(--ink); background:var(--card); box-shadow:0 1px 2px rgba(20,24,28,.06), 0 6px 18px -12px rgba(20,24,28,.3); }
+  .tab u { font-style:normal; text-decoration:none; font-weight:600; font-size:11px; opacity:.7; margin-left:6px; }
+  .tab.on u { color:var(--accent); opacity:1; }
 
   /* ---- toolbar ---- */
   .bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 0 14px; }
@@ -155,13 +165,18 @@
   .tag { font-size:11px; margin-left:5px; }
   .muted-cell { color:var(--muted); font-weight:400 !important; }
 
-  select.st { font-weight:600; font-size:13px; border-radius:20px; }
-  select.st[data-v=ordered]     { color:var(--s-ordered); }
-  select.st[data-v=production]  { color:var(--s-production); }
-  select.st[data-v=ready]       { color:var(--s-ready); }
-  select.st[data-v=shipped]     { color:var(--s-shipped); }
-  select.st[data-v=received]    { color:var(--s-received); }
-  select.st[data-v=problem]     { color:var(--s-problem); }
+  /* Status as a coloured pill: the state reads at a glance, not just as a word. */
+  select.st { font-weight:700; font-size:12px; border-radius:20px; padding:5px 26px 5px 10px; width:auto;
+              border:1px solid transparent; appearance:none; -webkit-appearance:none;
+              background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5'/%3E%3C/svg%3E");
+              background-repeat:no-repeat; background-position:right 9px center; }
+  select.st[data-v=ordered]     { color:var(--s-ordered);    background-color:var(--s-ordered-soft); }
+  select.st[data-v=production]  { color:var(--s-production); background-color:var(--s-production-soft); }
+  select.st[data-v=ready]       { color:var(--s-ready);      background-color:var(--s-ready-soft); }
+  select.st[data-v=shipped]     { color:var(--s-shipped);    background-color:var(--s-shipped-soft); }
+  select.st[data-v=received]    { color:var(--s-received);   background-color:var(--s-received-soft); }
+  select.st[data-v=problem]     { color:var(--s-problem);    background-color:var(--s-problem-soft); }
+  .shipped-ago { display:block; font-size:11px; color:var(--muted); margin-top:3px; padding-left:2px; }
 
   /* delivered jungiklis */
   .sw { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
@@ -305,6 +320,7 @@
 
 <div class="lb" id="lb"><figure><img id="lbimg" alt=""><figcaption id="lbcap"></figcaption></figure></div>
 
+<script src="shared.js"></script>
 <script>
 /* ---------------------------------------------------------------
    Config travels in the link itself (the part after #), not in this
@@ -419,7 +435,6 @@ function bulkView(label, category, opts) {
    Typing a number into the column sets a new count as of today — which is
    exactly what someone standing in the warehouse means by it.
 ----------------------------------------------------------------*/
-const STK = { trip:14, red:14, amber:28, cover:60, window:30, dead:60, round:10 };
 
 let stkSales = [], stkOrders = [], stkDays = new Set();
 
@@ -428,105 +443,9 @@ let stkSales = [], stkOrders = [], stkDays = new Set();
 // would make an ordinary status change fail to save.
 let HAS_RECEIVED_DATE = true;
 let stkVer = 0, stkMemo = new Map(), stkMemoVer = -1;
-const STK_NONE = { counted:false, left:0, s7:0, s30:0, perDay:0, perWeek:0,
-                   left_days:null, incoming:0, hot:false, dead:false, colour:"grey", suggest:0 };
 
-// Codes are matched the same way the product photo is looked up, so the two
-// can never disagree about which product a row is about.
-function stockMap(list) {
-  const m = new Map(), loose = new Map();
-  for (const r of list) { const k = photoNames(r.sku)[0]; if (k) m.set(k, r.sku); }
-  for (const r of list) for (const k of photoNames(r.sku).slice(1)) {
-    if (m.has(k)) continue;
-    if (!loose.has(k)) loose.set(k, new Set());
-    loose.get(k).add(r.sku);
-  }
-  // A stripped code claimed by two products (KTC165-A and KTC165-B) is dropped:
-  // better to leave a sale unmatched than to take it off the wrong variant.
-  for (const [k, who] of loose) if (who.size === 1) m.set(k, [...who][0]);
-  return m;
-}
-function stockMatch(sku, m) { for (const k of photoNames(sku)) if (m.has(k)) return m.get(k); return null; }
 
-function daysAgo(n) { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() - n); return iso(d); }
-
-function stkRebuild() {
-  stkMemo = new Map();
-  const m = stockMap(rows);
-  const sold = new Map(), incoming = new Map();
-
-  for (const s of stkSales) {
-    const t = stockMatch(s.sku, m); if (!t) continue;
-    if (!sold.has(t)) sold.set(t, []);
-    sold.get(t).push([String(s.sold_date).slice(0, 10), +s.qty || 0]);
-  }
-  for (const o of stkOrders) {
-    const t = stockMatch(o.sku, m); if (!t) continue;
-    const q = +o.qty || 0;
-    // A received box no longer moves the count — the warehouse enters what it
-    // unpacks in "+ Arrived". Marking it received only takes it off "on order".
-    if (o.status !== "received" && o.status !== "problem") {
-      incoming.set(t, (incoming.get(t) || 0) + q);
-    }
-  }
-
-  const sum = (list, from, to) =>
-    (list || []).reduce((n, [d, q]) => (d && d >= from && d <= to ? n + q : n), 0);
-  // Everything that happened AFTER the count day. What went out on the day
-  // itself was already off the shelf when it was counted — subtracting it
-  // again would show one day less stock than there is.
-  const sumAfter = (list, from, to) =>
-    (list || []).reduce((n, [d, q]) => (d && d > from && d <= to ? n + q : n), 0);
-  const now = iso(new Date());
-
-  // The speed is divided by the days actually read, not by a flat 30 — in the
-  // first week a 30-day divisor would show a tenth of the real rate.
-  let covered = 0;
-  for (let i = 0; i < STK.window; i++) if (stkDays.has(daysAgo(i))) covered++;
-  covered = covered || 1;
-
-  for (const r of rows) {
-    const list = sold.get(r.sku);
-    const counted = r.baseline_qty != null;
-    const base = +r.baseline_qty || 0;
-    const from = String(r.baseline_date || "").slice(0, 10);
-    const left = (counted && from)
-      // Arrivals are entered by the warehouse in the "+ Arrived" column, which
-      // raises the count directly. Adding them a second time from the orders
-      // board would double every box that gets marked "received" a day later.
-      ? base - sumAfter(list, from, now)
-      : base;
-
-    const s7 = sum(list, daysAgo(7), now);
-    const s30 = sum(list, daysAgo(STK.window), now);
-    const s60 = sum(list, daysAgo(STK.dead), now);
-    const perDay = s30 / covered;
-    // How long it will last can only be said once we know how many there are;
-    // for an uncounted product a zero would read as "sold out", which is false.
-    const leftDays = (counted && perDay > 0) ? Math.floor(left / perDay) : null;
-
-    let colour = "grey";
-    if (counted) {
-      if (left <= 0) colour = "red";
-      else if (leftDays === null) colour = "green";
-      else if (leftDays < STK.red) colour = "red";
-      else if (leftDays < STK.amber) colour = "orange";
-      else colour = "green";
-    }
-    const need = perDay > 0 ? perDay * (STK.trip + STK.cover) - left - (incoming.get(r.sku) || 0) : 0;
-
-    stkMemo.set(r.id, {
-      counted, base, baseDate: from, left, s7, s30, perDay,
-      perWeek: Math.round(perDay * 70) / 10,
-      left_days: leftDays, incoming: incoming.get(r.sku) || 0,
-      hot: s30 >= 10 && perDay > 0 && (s7 / 7) >= perDay * 1.3,
-      dead: counted && left > 0 && s60 === 0,
-      colour,
-      suggest: (counted && leftDays !== null && leftDays < STK.amber && need > 0)
-        ? Math.ceil(need / STK.round) * STK.round : 0,
-    });
-  }
-}
+function stkRebuild() { stkMemo = stkCompute(rows, stkSales, stkOrders, stkDays); }
 
 // Kada suskaiciuota "neseniai". Sandelio darbuotojo suvestos prekes beveik
 // visada yra zalios, o numatytas filtras rodo tik "Order now" — be sito
@@ -643,6 +562,11 @@ const VIEWS = {
 // `&only=` in the link narrows the page down to the named tabs.
 for (const key of Object.keys(VIEWS)) {
   if (ONLY.length && !ONLY.includes(key)) delete VIEWS[key];
+  // Stock is not part of the shared board any more (owner's decision,
+  // 2026-09-04): the partner in China only needs the orders, the owner reads
+  // stock on the private owner page, and the warehouse types counts through
+  // its own `only=stock` link. A plain link therefore shows orders only.
+  if (!ONLY.length && key === "stock") delete VIEWS[key];
 }
 const PIRMAS = Object.keys(VIEWS)[0] || "silver";
 
@@ -744,53 +668,11 @@ const api = {
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
-// LOCAL date, not UTC: toISOString() would give the person in China, typing at
-// 07:00 Beijing, yesterday's date — and the warehouse count "Counted on" too.
-function today() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 
-/* ---------------- tracking numbers ----------------
-   Every real tracking on this board is UPU S10: two letters, nine digits, two
-   letters (GV668040035GB). The ninth digit is a check digit, so a typo can be
-   caught the moment it is typed instead of a week later at the post office. */
-const S10_WEIGHTS = [8, 6, 4, 2, 3, 5, 9, 7];
-const CARRIERS = [
-  [/^[A-Z]{2}\d{9}GB$/, "Royal Mail",  t => `https://www.royalmail.com/track-your-item#/tracking-results/${t}`],
-  [/^[A-Z]{2}\d{9}YP$/, "Yun Express", t => `https://www.yuntrack.com/parcelTracking?id=${t}`],
-  [/^[A-Z]{2}\d{9}CN$/, "China Post",  t => `https://t.17track.net/en#nums=${t}`],
-  [/^YT\d{16}$/,        "Yanwen",      t => `https://track.yw56.com.cn/en/querydel?nums=${t}`],
-  [/^L[A-Z]\d{9,}[A-Z]*$/, "Cainiao",  t => `https://global.cainiao.com/detail.htm?mailNoList=${t}`],
-  [/^4PX/,              "4PX",         t => `https://track.4px.com/#/result/0/${t}`],
-];
-function cleanTracking(t) { return String(t || "").replace(/[\s\-]/g, "").toUpperCase(); }
-function s10ok(t) {                     // null = not S10 (no opinion), true/false = check digit
-  const m = /^[A-Z]{2}(\d{8})(\d)[A-Z]{2}$/.exec(t);
-  if (!m) return null;
-  let s = 0;
-  for (let i = 0; i < 8; i++) s += Number(m[1][i]) * S10_WEIGHTS[i];
-  const r = 11 - (s % 11);
-  const check = r === 10 ? 0 : (r === 11 ? 5 : r);
-  return check === Number(m[2]);
-}
-function carrierOf(t) {
-  for (const [rx, name, url] of CARRIERS) if (rx.test(t)) return [name, url(t)];
-  return [null, `https://t.17track.net/en#nums=${t}`];
-}
-// The SKU is the key to the photo and to the stock row, so it must be exact:
-// a trailing space ("KTR144 ") used to break both. Codes go upper-case; word
-// names ("neck basic") stay as typed, because that is how the stock row is called.
-function cleanSku(s) {
-  s = String(s || "").replace(/\s+/g, " ").trim();
-  return /^[A-Za-z]{1,5}\d/.test(s) ? s.toUpperCase() : s;
-}
 function uuid() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0, v = c === "x" ? r : (r & 0x3 | 0x8); return v.toString(16); });
-}
-function daysSince(d) {
-  if (!d) return "";
-  const ms = Date.now() - new Date(d + "T00:00:00").getTime();
-  return Math.max(0, Math.floor(ms / 86400000));
 }
 function setSync(state, msg) {
   $("#pulse").className = "pulse" + (state ? " " + state : "");
@@ -931,6 +813,19 @@ function statusCell(r) {
   sel.addEventListener("focus", () => { editing = r.id + ":status"; });
   sel.addEventListener("blur",  () => { if (editing === r.id + ":status") editing = null; });
   sel.addEventListener("change", () => { sel.dataset.v = sel.value; save(r.id, "status", sel.value); });
+  // The partner writes "shiped on 24 August" in the note instead of a tracking
+  // number — so the days in transit are shown right under the status.
+  const ago = daysSinceShipped(r);
+  if (ago >= 0 && (r.status === "shipped" || r.status === "production" || r.status === "ready" || r.status === "ordered")) {
+    const box = document.createElement("div");
+    box.appendChild(sel);
+    const s = document.createElement("span");
+    s.className = "shipped-ago";
+    s.textContent = r.status === "shipped" ? `shipped ${ago} d ago` : `note: shipped ${ago} d ago`;
+    if (ago > STK.trip) s.style.color = "var(--s-problem)";
+    box.appendChild(s);
+    return box;
+  }
   return sel;
 }
 
@@ -958,18 +853,6 @@ function switchCell(r, key) {
    "KTB005 20CM" is item KTB005 in size 20cm, "KTR144 S-8" is KTR144 in size 8.
    So we split on the space FIRST — stripping it away would glue the size onto
    the digits (KTB00520CM) and leave nothing to go on. */
-function photoNames(sku) {
-  const raw = String(sku || "").toUpperCase().trim();
-  const svarus = s => s.replace(/[^A-Z0-9-]/g, "");
-  const kand = [];
-  for (const v of [svarus(raw), svarus(raw.split(/\s+/)[0])]) {
-    if (v && !kand.includes(v)) kand.push(v);
-  }
-  // Ir tas pats be dangos priesagos gale („KTC165-A" → „KTC165").
-  const be_variantu = (kand[kand.length - 1] || "").replace(/-[A-Z]{1,3}\d?$/, "");
-  if (be_variantu && !kand.includes(be_variantu)) kand.push(be_variantu);
-  return kand;
-}
 
 function photoUrl(name, big) {
   if (!name || !SUPABASE_URL) return "";
@@ -1313,7 +1196,6 @@ let breakdownMode = "weeks";
 let panelOpen = (() => { try { return localStorage.getItem("board_stats") !== "0"; } catch (e) { return true; } })();
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const iso = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 function parseDay(s) { return s ? new Date(String(s).slice(0, 10) + "T00:00:00") : null; }
 function startOfWeek(d) {                       // Monday
   const x = new Date(d); x.setHours(0,0,0,0);
