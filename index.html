@@ -85,6 +85,12 @@
   tbody tr.done { opacity:.5; }
   td input, td textarea, td select { width:100%; border-color:transparent; background:transparent; padding:7px 8px; }
   td input:hover, td textarea:hover, td select:hover { border-color:var(--line); }
+  td input.bad { border-color:var(--s-problem); background:color-mix(in srgb, var(--s-problem) 10%, transparent); }
+  td .unsaved { border-color:var(--s-problem) !important; border-style:dashed; }
+  .trk { display:flex; align-items:center; gap:4px; }
+  .trk input { flex:1 1 auto; min-width:0; }
+  .trk-link { font-size:11px; color:var(--accent); text-decoration:none; white-space:nowrap; opacity:.8; }
+  .trk-link:hover { text-decoration:underline; opacity:1; }
   td textarea { resize:vertical; min-height:36px; }
   .mono { font-variant-numeric:tabular-nums; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
 
@@ -656,6 +662,10 @@ let filter = (ONLY.length
 let query = "";
 let editing = null;       // id:field currently focused — never overwritten by a poll
 let pending = new Map();  // id -> {field:value} not yet confirmed by the server
+// id -> {field:value} the server REFUSED or never got (connection dropped).
+// Retried every 15 s; the cell stays outlined in red until it lands, so an
+// edit typed on a train in China is not silently lost.
+let failed = new Map();
 
 /* ---------------- storage layer ---------------- */
 const api = {
@@ -734,7 +744,44 @@ const api = {
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
-function today() { return new Date().toISOString().slice(0, 10); }
+// LOCAL date, not UTC: toISOString() would give the person in China, typing at
+// 07:00 Beijing, yesterday's date — and the warehouse count "Counted on" too.
+function today() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+
+/* ---------------- tracking numbers ----------------
+   Every real tracking on this board is UPU S10: two letters, nine digits, two
+   letters (GV668040035GB). The ninth digit is a check digit, so a typo can be
+   caught the moment it is typed instead of a week later at the post office. */
+const S10_WEIGHTS = [8, 6, 4, 2, 3, 5, 9, 7];
+const CARRIERS = [
+  [/^[A-Z]{2}\d{9}GB$/, "Royal Mail",  t => `https://www.royalmail.com/track-your-item#/tracking-results/${t}`],
+  [/^[A-Z]{2}\d{9}YP$/, "Yun Express", t => `https://www.yuntrack.com/parcelTracking?id=${t}`],
+  [/^[A-Z]{2}\d{9}CN$/, "China Post",  t => `https://t.17track.net/en#nums=${t}`],
+  [/^YT\d{16}$/,        "Yanwen",      t => `https://track.yw56.com.cn/en/querydel?nums=${t}`],
+  [/^L[A-Z]\d{9,}[A-Z]*$/, "Cainiao",  t => `https://global.cainiao.com/detail.htm?mailNoList=${t}`],
+  [/^4PX/,              "4PX",         t => `https://track.4px.com/#/result/0/${t}`],
+];
+function cleanTracking(t) { return String(t || "").replace(/[\s\-]/g, "").toUpperCase(); }
+function s10ok(t) {                     // null = not S10 (no opinion), true/false = check digit
+  const m = /^[A-Z]{2}(\d{8})(\d)[A-Z]{2}$/.exec(t);
+  if (!m) return null;
+  let s = 0;
+  for (let i = 0; i < 8; i++) s += Number(m[1][i]) * S10_WEIGHTS[i];
+  const r = 11 - (s % 11);
+  const check = r === 10 ? 0 : (r === 11 ? 5 : r);
+  return check === Number(m[2]);
+}
+function carrierOf(t) {
+  for (const [rx, name, url] of CARRIERS) if (rx.test(t)) return [name, url(t)];
+  return [null, `https://t.17track.net/en#nums=${t}`];
+}
+// The SKU is the key to the photo and to the stock row, so it must be exact:
+// a trailing space ("KTR144 ") used to break both. Codes go upper-case; word
+// names ("neck basic") stay as typed, because that is how the stock row is called.
+function cleanSku(s) {
+  s = String(s || "").replace(/\s+/g, " ").trim();
+  return /^[A-Za-z]{1,5}\d/.test(s) ? s.toUpperCase() : s;
+}
 function uuid() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -833,9 +880,47 @@ function cellInput(r, col) {
   el.value = r[col.key] == null ? "" : r[col.key];
   el.addEventListener("focus", () => { editing = r.id + ":" + col.key; });
   el.addEventListener("blur",  () => { if (editing === r.id + ":" + col.key) editing = null; });
-  el.addEventListener("change", () =>
-    save(r.id, col.key, col.num ? (el.value === "" ? null : Number(el.value)) : el.value));
+  el.addEventListener("change", () => {
+    let v = col.num ? (el.value === "" ? null : Number(el.value)) : el.value;
+    if (col.key === "sku") { v = cleanSku(v); el.value = v; }
+    save(r.id, col.key, v);
+  });
+  if (failed.has(r.id)) el.classList.add("unsaved");
   return el;
+}
+
+// Tracking cell: the number is cleaned as it is typed (spaces, dashes, case),
+// checked against its own check digit, the carrier is filled in from the
+// number's shape, and a small link opens the courier's tracking page.
+function trackingCell(r, col) {
+  const box = document.createElement("div");
+  box.className = "trk";
+  const el = cellInput(r, col);
+  const a = document.createElement("a");
+  a.target = "_blank"; a.rel = "noopener"; a.className = "trk-link"; a.textContent = "track";
+  const show = t => {
+    const ok = s10ok(t);
+    el.classList.toggle("bad", ok === false);
+    el.title = ok === false ? "Check digit does not match — please re-check this number" : "";
+    const [, url] = carrierOf(t);
+    a.href = url; a.hidden = !t;
+  };
+  show(cleanTracking(r.tracking));
+  // cellInput's own change handler saves the raw value; this one runs after it
+  // and, if cleaning changed anything, saves the clean form on top of it.
+  el.addEventListener("change", () => {
+    const t = cleanTracking(el.value);
+    if (t !== el.value) { el.value = t; save(r.id, col.key, t); }
+    show(t);
+    const [carrier] = carrierOf(t);
+    if (t && carrier && "carrier" in r && !(r.carrier || "").trim()) {
+      save(r.id, "carrier", carrier);
+      const cin = document.querySelector(`tr[data-id="${r.id}"] .c-carrier input`);
+      if (cin) cin.value = carrier;
+    }
+  });
+  box.appendChild(el); box.appendChild(a);
+  return box;
 }
 
 function statusCell(r) {
@@ -1041,7 +1126,7 @@ function renderCounted() {
   const nauji = rows.filter(stkJustCounted);
   if (!nauji.length) { box.hidden = true; return; }
 
-  const siandien = new Date().toISOString().slice(0, 10);
+  const siandien = today();
   const dabar = nauji.filter(r => (r.baseline_date || "").slice(0, 10) === siandien);
   const vnt = d => d.reduce((s, r) => s + (Number(r.baseline_qty) || 0), 0);
 
@@ -1088,6 +1173,7 @@ function render() {
       else if (col.kind === "stock")  td.appendChild(stockCell(r));
       else if (col.kind === "add")    td.appendChild(addCell(r));
       else if (col.kind === "calc")   td.appendChild(calcCell(r, col));
+      else if (col.key === "tracking") td.appendChild(trackingCell(r, col));
       else                            td.appendChild(cellInput(r, col));
       tr.appendChild(td);
     }
@@ -1145,11 +1231,7 @@ async function save(id, field, value, extra) {
   try {
     setSync("busy", "saving…");
     await api.patch(v, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
-    const cur = pending.get(id);
-    if (cur) {
-      for (const k of Object.keys(patch)) delete cur[k];
-      if (!Object.keys(cur).length) pending.delete(id);
-    }
+    confirmed(id, patch);
     setSync("", "saved · live");
   } catch (e) {
     // The one failure we can repair ourselves: writing received_date before
@@ -1159,14 +1241,54 @@ async function save(id, field, value, extra) {
       delete patch.received_date;
       try {
         await api.patch(v, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
-        pending.delete(id);
+        confirmed(id, patch);
         setSync("", "saved · live");
         return;
       } catch (e2) { /* fall through to the honest message below */ }
     }
-    setSync("off", "not saved — check connection, then retype");
+    // Keep it and try again — most failures are a dropped connection, not a
+    // wrong value. The row is outlined until the server has it.
+    failed.set(id, Object.assign(failed.get(id) || {}, patch, { _view: v }));
+    markUnsaved(id, true);
+    setSync("off", `not saved yet — ${failed.size} change(s) waiting, retrying…`);
   }
 }
+
+function confirmed(id, patch) {
+  const cur = pending.get(id);
+  if (cur) {
+    for (const k of Object.keys(patch)) delete cur[k];
+    if (!Object.keys(cur).length) pending.delete(id);
+  }
+  const f = failed.get(id);
+  if (f) {
+    for (const k of Object.keys(patch)) delete f[k];
+    if (!Object.keys(f).filter(k => k !== "_view").length) { failed.delete(id); markUnsaved(id, false); }
+  }
+}
+
+function markUnsaved(id, on) {
+  document.querySelectorAll(`tr[data-id="${id}"] input, tr[data-id="${id}"] select, tr[data-id="${id}"] textarea`)
+    .forEach(el => el.classList.toggle("unsaved", on));
+}
+
+async function retryFailed() {
+  if (!failed.size || DEMO) return;
+  for (const [id, f] of [...failed]) {
+    const { _view, ...patch } = f;
+    if (!Object.keys(patch).length) { failed.delete(id); markUnsaved(id, false); continue; }
+    try {
+      await api.patch(_view, id, Object.assign({ updated_at: new Date().toISOString() }, patch));
+      confirmed(id, patch);
+    } catch (e) { /* still offline — next tick */ }
+  }
+  if (!failed.size) setSync("", "saved · live");
+  else setSync("off", `not saved yet — ${failed.size} change(s) waiting, retrying…`);
+}
+setInterval(retryFailed, 15000);
+window.addEventListener("online", retryFailed);
+// Closing the tab with unsaved edits would lose them — ask first.
+window.addEventListener("beforeunload", e => { if (failed.size) { e.preventDefault(); e.returnValue = ""; } });
 
 async function addRow() {
   const row = Object.assign({ id: uuid(), created_at: new Date().toISOString(),
