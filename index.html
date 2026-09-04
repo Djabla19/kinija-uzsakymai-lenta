@@ -825,9 +825,6 @@ function renderHead() {
     th.textContent = c.label;
     tr.appendChild(th);
   }
-  const th = document.createElement("th");
-  th.className = "c-del";
-  tr.appendChild(th);
 }
 
 function renderChips() {
@@ -1178,17 +1175,10 @@ function render() {
       tr.appendChild(td);
     }
 
-    const tdDel = document.createElement("td");
-    tdDel.className = "c-del"; tdDel.dataset.l = "";
-    // A narrowed-down page is someone else's workplace: they add and count,
-    // they do not remove products from the list.
-    if (!ONLY.length) {
-      const del = document.createElement("button");
-      del.className = "del"; del.title = "Delete"; del.textContent = "✕";
-      del.addEventListener("click", () => removeRow(r));
-      tdDel.appendChild(del);
-    }
-    tr.appendChild(tdDel);
+    // No delete button. The shared link can read, add and edit, but since
+    // 2026-09-04 it cannot delete — anyone holding the link could otherwise
+    // wipe every order through the API. A wrong row is marked Received /
+    // Delivered, or removed by the owner with `orders.py trink`.
 
     tb.appendChild(tr);
   }
@@ -1312,14 +1302,6 @@ async function addRow() {
   catch (e) { setSync("off", "could not create the row — reload the page"); }
 }
 
-async function removeRow(r) {
-  const what = r.sku || r.graving || r.product || "this order";
-  if (!confirm(`Delete ${what}?`)) return;
-  const v = view;
-  rows = rows.filter(x => x.id !== r.id);
-  render();
-  try { await api.remove(v, r.id); } catch (e) { setSync("off", "delete failed — reload the page"); }
-}
 
 /* ---------------- statistics ----------------
    Counts an order in the week it was finished (done_date), not the week it
