@@ -139,7 +139,8 @@
   </section>
 
   <section class="view" id="v-cat">
-    <div class="toolbar"><input type="search" id="catq" placeholder="Search SKU…"><div class="seg" id="sort"><button class="on" data-s="sold">Best sellers</button><button data-s="sku">By SKU</button><button data-s="stock">Low stock first</button></div><div class="seg" id="types"></div></div>
+    <div class="toolbar"><input type="search" id="catq" placeholder="Search SKU…"><div class="seg" id="sort"><button class="on" data-s="sold">Best sellers</button><button data-s="sku">By SKU</button><button data-s="stock">Low stock first</button></div><div class="seg" id="brand"></div></div>
+    <div class="toolbar"><div class="seg" id="types"></div></div>
     <div class="cards" id="cards"></div>
   </section>
 
@@ -294,7 +295,11 @@ function renderDash() {
 }
 
 /* ---------------- catalogue ---------------- */
-let sort = "sold", type = "all", catQuery = "", shown = 120;
+let sort = "sold", type = "all", brand = "sava", catQuery = "", shown = 120;
+// Two catalogues, not one list: Pandora is a different supplier with a larger
+// range, so "Charms" would mean two things at once. Same split as the colleagues' catalogue.
+const BRANDS = [["sava", "Silver Unbranded", r => r.k !== "pandora"], ["pandora", "Pandora", r => r.k === "pandora"]];
+const inBrand = r => (BRANDS.find(b => b[0] === brand) || BRANDS[0])[2](r);
 let catRows = [];
 function buildCatalogue() {
   const byName = new Map(D.stock.map(r => [r.sku, D.memo.get(r.id)]));
@@ -309,13 +314,20 @@ function buildCatalogue() {
     const spark = []; for (let i = 29; i >= 0; i--) spark.push(dm ? (dm.get(daysAgo(i)) || 0) : 0);
     return { p, sku: p.sku, tipas: p.tipas || "other", k: p.k || "silver", q30: saleSku ? per30.get(saleSku) || 0 : 0, x, spark };
   });
-  const cnt = {}; for (const r of catRows) cnt[r.tipas] = (cnt[r.tipas] || 0) + 1;
+  renderBrandChips(); renderTypeChips();
+}
+function renderBrandChips() {
+  $("#brand").innerHTML = BRANDS.map(([k, l, fn]) => `<button data-b="${k}" class="${k === brand ? "on" : ""}">${l} <span style="font-size:11px;opacity:.7">${catRows.filter(fn).length}</span></button>`).join("");
+}
+function renderTypeChips() {
+  const rows = catRows.filter(inBrand);
+  const cnt = {}; for (const r of rows) cnt[r.tipas] = (cnt[r.tipas] || 0) + 1;
   const types = ["all", ...Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])];
-  $("#types").innerHTML = types.map(t => `<button data-t="${t}" class="${t === type ? "on" : ""}">${t[0].toUpperCase() + t.slice(1)} <span style="font-size:11px;opacity:.7">${t === "all" ? catRows.length : cnt[t]}</span></button>`).join("");
+  $("#types").innerHTML = types.map(t => `<button data-t="${t}" class="${t === type ? "on" : ""}">${t[0].toUpperCase() + t.slice(1)} <span style="font-size:11px;opacity:.7">${t === "all" ? rows.length : cnt[t]}</span></button>`).join("");
 }
 function spark(v, w = 150, h = 22) { const mx = Math.max(...v, 1), step = w / v.length; return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">${v.map((q, i) => `<rect x="${i * step}" y="${h - q / mx * h}" width="${Math.max(0.5, step - 1)}" height="${q / mx * h}" fill="var(--accent)" opacity="${q ? .8 : .15}"/>`).join("")}</svg>`; }
 function renderCards() {
-  let list = catRows.filter(r => (type === "all" || r.tipas === type) && (!catQuery || r.sku.toUpperCase().includes(catQuery)));
+  let list = catRows.filter(r => inBrand(r) && (type === "all" || r.tipas === type) && (!catQuery || r.sku.toUpperCase().includes(catQuery)));
   if (sort === "sold") list.sort((a, b) => b.q30 - a.q30 || a.sku.localeCompare(b.sku));
   if (sort === "sku") list.sort((a, b) => a.sku.localeCompare(b.sku));
   if (sort === "stock") list.sort((a, b) => ((a.x && a.x.counted) ? (a.x.left_days ?? a.x.left) : 1e9) - ((b.x && b.x.counted) ? (b.x.left_days ?? b.x.left) : 1e9));
@@ -324,7 +336,8 @@ function renderCards() {
     + (list.length > shown ? `<div class="more"><button class="btn" id="more">Show ${Math.min(120, list.length - shown)} more of ${list.length}</button></div>` : "");
 }
 $("#sort").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; sort = b.dataset.s; $("#sort").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); shown = 120; renderCards(); });
-$("#types").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; type = b.dataset.t; $("#types").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); shown = 120; renderCards(); });
+$("#types").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; type = b.dataset.t; renderTypeChips(); shown = 120; renderCards(); });
+$("#brand").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; brand = b.dataset.b; type = "all"; shown = 120; renderBrandChips(); renderTypeChips(); renderCards(); });
 $("#catq").addEventListener("input", e => { catQuery = e.target.value.trim().toUpperCase(); shown = 120; renderCards(); });
 $("#cards").addEventListener("click", e => {
   if (e.target.id === "more") { shown += 120; renderCards(); return; }
