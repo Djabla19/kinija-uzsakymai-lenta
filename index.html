@@ -471,8 +471,8 @@ function stockView() {
     label: "Stock",
     table: "stock",
     stock: true,
-    order: "sku.asc",
-    search: "Search SKU…",
+    order: "sku.asc,size.asc",
+    search: "Search SKU or size…",
     // Named after what the person is doing, not after what the database gets:
     // in the warehouse this button is reached for when goods arrive that are
     // not on the list yet, and that is "adding stock", not "creating a product".
@@ -480,6 +480,10 @@ function stockView() {
     cols: [
       { key:"photo",   label:"",          kind:"photo" },
       { key:"sku",     label:"SKU",       cls:"mono", ph:"KTE092" },
+      // Bracelets (18 / 19 / 20 cm) and rings (6–9 US, 50–58 EU) run out one
+      // size at a time, so each size is its own row (owner's decision
+      // 2026-09-07). Empty for everything else and for adjustable pieces.
+      { key:"size",    label:"Size",      cls:"mono", ph:"18CM · 7 · 54" },
       { key:"instock", label:"In stock",  kind:"stock" },
       { key:"add",     label:"+ Arrived", kind:"add" },
       num("Sold 7d",  "s7",       i => i.s30 || i.s7 ? i.s7 : ""),
@@ -491,7 +495,7 @@ function stockView() {
       { key:"baseline_date", label:"Counted on", type:"date", cls:"mono" },
       { key:"note",    label:"Notes",     tag:"textarea", ph:"notes" },
     ],
-    blank: () => ({ sku:"", baseline_qty:null, baseline_date:null, note:"" }),
+    blank: () => ({ sku:"", size:"", baseline_qty:null, baseline_date:null, note:"" }),
     done: () => false,
     stats: [
       { label:"Products",  fn: () => true },
@@ -631,12 +635,15 @@ const api = {
     if (DEMO) return { sales: [], orders: [], days: [] };
     const from = daysAgo(400);
     const [sales, orders, days] = await Promise.all([
-      api.page(`sales?select=sold_date,sku,qty&sold_date=gte.${from}&order=sold_date.asc,sku.asc`),
+      // `size` exists only after setup-dydziai.sql; before that, fall back to
+      // the old shape so the tab still works (every product then counts as unsized).
+      api.page(`sales?select=sold_date,sku,qty,size&sold_date=gte.${from}&order=sold_date.asc,sku.asc`)
+         .catch(() => api.page(`sales?select=sold_date,sku,qty&sold_date=gte.${from}&order=sold_date.asc,sku.asc`)),
       // received_date exists only after setup-gavimo-data.sql has been run. Fall
       // back to the old shape rather than leaving the whole tab blank.
-      api.page(`orders?select=sku,qty,status,order_date,received_date&order=id.asc`)
+      api.page(`orders?select=sku,qty,size,status,order_date,received_date&order=id.asc`)
          .catch(() => { HAS_RECEIVED_DATE = false;
-                        return api.page(`orders?select=sku,qty,status,order_date&order=id.asc`); }),
+                        return api.page(`orders?select=sku,qty,size,status,order_date&order=id.asc`); }),
       api.page(`sales_scan?select=scan_date&scan_date=gte.${daysAgo(40)}&order=scan_date.desc`),
     ]);
     return { sales, orders, days };
@@ -762,6 +769,7 @@ function cellInput(r, col) {
   el.addEventListener("change", () => {
     let v = col.num ? (el.value === "" ? null : Number(el.value)) : el.value;
     if (col.key === "sku") { v = cleanSku(v); el.value = v; }
+    if (col.key === "size") { v = sizeOf(v) || String(v || "").trim().toUpperCase(); el.value = v; }
     save(r.id, col.key, v);
   });
   if (failed.has(r.id)) el.classList.add("unsaved");
