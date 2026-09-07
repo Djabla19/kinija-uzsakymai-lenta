@@ -162,10 +162,12 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
 
   const sum = (list, from, to) =>
     (list || []).reduce((n, [d, q]) => (d && d >= from && d <= to ? n + q : n), 0);
-  // Everything that happened AFTER the count day. What went out on the day
-  // itself was already off the shelf when it was counted.
+  // Everything sold since the count day, that day included (owner's decision
+  // 2026-09-07). The count is taken in the morning, before the day's labels
+  // are printed; skipping the count day used to lose that day's sales for good.
+  // Must match stock.py parduota_po().
   const sumAfter = (list, from, to) =>
-    (list || []).reduce((n, [d, q]) => (d && d > from && d <= to ? n + q : n), 0);
+    (list || []).reduce((n, [d, q]) => (d && d >= from && d <= to ? n + q : n), 0);
   const now = today();
 
   // The speed is divided by the days actually read, not by a flat 30 — in the
