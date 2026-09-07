@@ -140,15 +140,39 @@ function stockMatch(sku, m) { for (const k of photoNames(sku)) if (m.has(k)) ret
 /* rows = stock table, sales = {sold_date, sku, qty}, orders = {sku, qty, status},
    days = Set of scanned dates. Returns Map(row.id -> figures) plus, on the map
    itself, `.sold` (stock sku -> [[date, qty]...]) for sparklines. */
+// Size out of free text, three shapes in this order (same as stock.py dydis_is_teksto):
+//   bracelet length 15–25 cm with "CM" ("18cm", "KTB005 20cm") → "18CM";
+//   US ring size 4–13 after "SIZE", "S-", "US", a space or at the start ("KTR084 7", "US6") → "7";
+//   EU ring size 44–64 after a letter or space ("ring glory 54", "RINGSOLID58") → "54".
+// A size found on a product that has no size rows is simply ignored.
+function sizeOf(s) {
+  const t = String(s || "").toUpperCase();
+  let m = /(?:^|[^0-9])(1[5-9]|2[0-5])\s*-?\s*CM(?![A-Z])/.exec(t);
+  if (m) return m[1] + "CM";
+  m = /(?:^|SIZE|S-|US|UK|\s)\s*-?\s*([4-9]|1[0-3])(?![0-9])/.exec(t);
+  if (m) return m[1];
+  m = /(?:^|[^0-9])(4[4-9]|5[0-9]|6[0-4])(?![0-9])/.exec(t);
+  return m ? m[1] : "";
+}
+const sizeKey = (sku, size) => sku + "\u0000" + (size || "");
+
+/* Bracelets and rings are tracked per size since 2026-09-07 (owner's decision):
+   a stock row is (sku, size). A sale with a size lands on that size's row; a product
+   without size rows gets every sale, whatever the label said; a sized product's
+   sale with no size in the label falls on its "" row if one exists, else nowhere
+   (stock.py report lists those). Same rules as stock.py busena(). */
 function stkCompute(rows, stkSales, stkOrders, stkDays) {
   const memo = new Map();
   const m = stockMap(rows);
-  const sold = new Map(), incoming = new Map();
+  const sized = new Set(rows.filter(r => r.size).map(r => r.sku));
+  const soldBy = new Map(), soldAll = new Map(), incBy = new Map(), incAll = new Map();
+  const push = (map, k, v) => { if (!map.has(k)) map.set(k, []); map.get(k).push(v); };
 
   for (const s of stkSales) {
     const t = stockMatch(s.sku, m); if (!t) continue;
-    if (!sold.has(t)) sold.set(t, []);
-    sold.get(t).push([String(s.sold_date).slice(0, 10), +s.qty || 0]);
+    const v = [String(s.sold_date).slice(0, 10), +s.qty || 0];
+    push(soldBy, sizeKey(t, sizeOf(s.size)), v);
+    push(soldAll, t, v);
   }
   for (const o of stkOrders) {
     const t = stockMatch(o.sku, m); if (!t) continue;
@@ -156,9 +180,15 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
     // A received box no longer moves the count — the warehouse enters what it
     // unpacks in "+ Arrived". Marking it received only takes it off "on order".
     if (o.status !== "received" && o.status !== "problem") {
-      incoming.set(t, (incoming.get(t) || 0) + q);
+      const k = sizeKey(t, sizeOf(o.size));
+      incBy.set(k, (incBy.get(k) || 0) + q);
+      incAll.set(t, (incAll.get(t) || 0) + q);
     }
   }
+  const listFor = r => r.size ? soldBy.get(sizeKey(r.sku, sizeOf(r.size)))
+                      : (sized.has(r.sku) ? soldBy.get(sizeKey(r.sku, "")) : soldAll.get(r.sku));
+  const incFor = r => r.size ? (incBy.get(sizeKey(r.sku, sizeOf(r.size))) || 0)
+                     : (sized.has(r.sku) ? (incBy.get(sizeKey(r.sku, "")) || 0) : (incAll.get(r.sku) || 0));
 
   const sum = (list, from, to) =>
     (list || []).reduce((n, [d, q]) => (d && d >= from && d <= to ? n + q : n), 0);
@@ -177,7 +207,7 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
   covered = covered || 1;
 
   for (const r of rows) {
-    const list = sold.get(r.sku);
+    const list = listFor(r);
     const counted = r.baseline_qty != null;
     const base = +r.baseline_qty || 0;
     const from = String(r.baseline_date || "").slice(0, 10);
@@ -197,12 +227,13 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
       else if (leftDays < STK.amber) colour = "orange";
       else colour = "green";
     }
-    const need = perDay > 0 ? perDay * (STK.trip + STK.cover) - left - (incoming.get(r.sku) || 0) : 0;
+    const inc = incFor(r);
+    const need = perDay > 0 ? perDay * (STK.trip + STK.cover) - left - inc : 0;
 
     memo.set(r.id, {
       counted, base, baseDate: from, left, s7, s30, perDay,
       perWeek: Math.round(perDay * 70) / 10,
-      left_days: leftDays, incoming: incoming.get(r.sku) || 0,
+      left_days: leftDays, incoming: inc, size: sizeOf(r.size),
       hot: s30 >= 10 && perDay > 0 && (s7 / 7) >= perDay * 1.3,
       dead: counted && left > 0 && s60 === 0,
       colour,
@@ -210,7 +241,8 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
         ? Math.ceil(need / STK.round) * STK.round : 0,
     });
   }
-  memo.sold = sold;
+  memo.sold = soldAll;        // per product, for sparklines
   memo.map = m;
+  memo.sized = sized;
   return memo;
 }
