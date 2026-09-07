@@ -961,8 +961,15 @@ function addCell(r) {
     const n = Number(el.value);
     el.value = "";
     if (!n) return;
-    const naujas = stkInfo(r).left + n;
-    save(r.id, "baseline_qty", naujas, { baseline_date: today() });
+    // A box arriving does not change what was sold, so the count day stays
+    // where it was and the pieces are simply added to the counted number.
+    // Moving the date to today would drop today's sales (they are subtracted
+    // from the count day on) — and re-subtract them on top of "left".
+    if (r.baseline_qty == null) {
+      save(r.id, "baseline_qty", n, { baseline_date: today() });
+    } else {
+      save(r.id, "baseline_qty", (+r.baseline_qty || 0) + n);
+    }
   });
   return el;
 }
