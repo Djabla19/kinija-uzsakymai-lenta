@@ -97,6 +97,10 @@
   td input:hover, td textarea:hover, td select:hover { border-color:var(--line); }
   td input.bad { border-color:var(--s-problem); background:color-mix(in srgb, var(--s-problem) 10%, transparent); }
   td .unsaved { border-color:var(--s-problem) !important; border-style:dashed; }
+  /* A stock row still waiting for its SKU — a count cannot be saved into it. */
+  td.needs-sku-cell input, input.needs-sku {
+    border-color:var(--s-problem) !important; background:#fff5f5;
+  }
   .trk { display:flex; align-items:center; gap:4px; }
   .trk input { flex:1 1 auto; min-width:0; }
   .trk-link { font-size:11px; color:var(--accent); text-decoration:none; white-space:nowrap; opacity:.8; }
@@ -1061,6 +1065,11 @@ function render() {
       const td = document.createElement("td");
       td.className = "c-" + col.key;
       td.dataset.l = col.label;
+      // An unfinished "+ Add stock" row is easy to walk away from; the outline
+      // says the row is not a product yet, before a count is typed into it.
+      if (view.stock && col.key === "sku" && !String(r.sku || "").trim()) {
+        td.classList.add("needs-sku-cell");
+      }
       if (col.kind === "status")      td.appendChild(statusCell(r));
       else if (col.kind === "switch") td.appendChild(switchCell(r, col.key));
       else if (col.kind === "photo")  td.appendChild(photoCell(r));
@@ -1092,6 +1101,30 @@ function flash(id) {
 /* ---------------- writes ---------------- */
 async function save(id, field, value, extra) {
   const row = rows.find(r => r.id === id);
+
+  // A stock row with no SKU belongs to no product, so a count typed into it is
+  // read by nothing — not this page, not the catalogue, not `stock.py`. On
+  // 2026-09-08 five pieces of KTC1729 were lost exactly this way: "+ Add stock"
+  // creates the row before anything is typed, and the SKU was never filled in.
+  // Nothing warned anyone. Refuse the number and send the cursor where it is
+  // actually needed instead of storing it where no one will ever read it.
+  if (view.stock && field === "baseline_qty" && row && !String(row.sku || "").trim()) {
+    setSync("off", "type the SKU first — this row has no product yet");
+    for (const k of ["instock", "add"]) {
+      const el = document.querySelector(`tr[data-id="${id}"] .c-${k} input`);
+      if (el) el.value = "";
+    }
+    const sku = document.querySelector(`tr[data-id="${id}"] .c-sku input`);
+    if (sku) { sku.focus(); sku.classList.add("needs-sku"); }
+    return;
+  }
+
+  // Once the SKU is there the row is a product like any other — drop the warning.
+  if (view.stock && field === "sku" && String(value || "").trim()) {
+    document.querySelectorAll(`tr[data-id="${id}"] .needs-sku, tr[data-id="${id}"] .needs-sku-cell`)
+      .forEach(el => el.classList.remove("needs-sku", "needs-sku-cell"));
+  }
+
   const patch = Object.assign({ [field]: value }, extra || {});
 
   // Stamp the day the work was finished the first time it is marked shipped or
