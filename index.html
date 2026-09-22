@@ -515,7 +515,10 @@ function stockView() {
       { key:"all",     label:"All",       fn: () => true },
       { key:"out",     label:"Out",       fn: r => stkInfo(r).counted && stkInfo(r).left <= 0 },
       { key:"hot",     label:"Selling fast", fn: r => stkInfo(r).hot },
-      { key:"dead",    label:"Not moving", fn: r => stkInfo(r).dead },
+      // "Not moving" vs "Never sold" — same split as stock.py report, so the
+      // board and the report never show different numbers for the same thing.
+      { key:"dead",    label:"Not moving", fn: r => stkInfo(r).dead && !stkInfo(r).never },
+      { key:"never",   label:"Never sold", fn: r => stkInfo(r).never },
       { key:"nocount", label:"Not counted", fn: r => !stkInfo(r).counted },
     ],
   };
