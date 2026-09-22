@@ -145,7 +145,7 @@
   </section>
 
   <section class="view" id="v-stock">
-    <div class="toolbar"><input type="search" id="stq" placeholder="Search SKU…"><div class="seg" id="stf"><button class="on" data-f="low">Order now</button><button data-f="hot">Selling fast</button><button data-f="dead">Not moving</button><button data-f="counted">Counted</button><button data-f="all">All</button></div><a class="btn" id="boardlink" href="#" target="_blank" rel="noopener">Edit counts on the board ↗</a></div>
+    <div class="toolbar"><input type="search" id="stq" placeholder="Search SKU…"><div class="seg" id="stf"><button class="on" data-f="low">Order now</button><button data-f="hot">Selling fast</button><button data-f="dead">Not moving</button><button data-f="never">Never sold</button><button data-f="counted">Counted</button><button data-f="all">All</button></div><a class="btn" id="boardlink" href="#" target="_blank" rel="noopener">Edit counts on the board ↗</a></div>
     <div class="grid kpis" id="stockkpis" style="margin-bottom:16px"></div>
     <div class="panel" style="padding:0"><div class="tw"><table id="stock"></table></div></div>
   </section>
@@ -232,6 +232,7 @@ function byProduct(stock, memo) {
       suggest: p.sizes.reduce((n, s) => n + s.x.suggest, 0),
       left_days: c.length ? Math.min(...c.map(s => s.x.left_days ?? 1e9)) : null,
       hot: p.sizes.some(s => s.x.hot), dead: c.length > 0 && c.every(s => s.x.dead),
+      never: c.length > 0 && c.every(s => s.x.never),
       colour: c.length ? WORST[Math.min(...c.map(s => WORST.indexOf(s.x.colour)))] : "grey",
     });
     if (p.left_days === 1e9) p.left_days = null;
@@ -367,7 +368,7 @@ function renderCards() {
   if (sort === "sku") list.sort((a, b) => a.sku.localeCompare(b.sku));
   if (sort === "stock") list.sort((a, b) => ((a.x && a.x.counted) ? (a.x.left_days ?? a.x.left) : 1e9) - ((b.x && b.x.counted) ? (b.x.left_days ?? b.x.left) : 1e9));
   const slice = list.slice(0, shown);
-  $("#cards").innerHTML = slice.map(r => `<button class="card" data-sku="${r.sku}"><div class="im"><img loading="lazy" src="${thumb(r.p)}" alt="${r.sku}" onerror="this.remove()">${r.x && r.x.hot ? `<span class="badge chip up">🔥 selling fast</span>` : r.x && r.x.dead ? `<span class="badge chip flat">💤 not moving</span>` : ""}${r.q30 ? `<span class="qty">${r.q30} sold · 30 d</span>` : ""}</div><div class="meta"><span class="sku mono">${r.sku}</span><span class="tp">${r.tipas}${r.x && r.x.counted ? ` · <span style="color:${colour(r.x.colour)};font-weight:700">${r.x.left} in stock</span>` : ""}</span>${sizesLine(r.x)}<div class="sp">${spark(r.spark)}</div></div></button>`).join("")
+  $("#cards").innerHTML = slice.map(r => `<button class="card" data-sku="${r.sku}"><div class="im"><img loading="lazy" src="${thumb(r.p)}" alt="${r.sku}" onerror="this.remove()">${r.x && r.x.hot ? `<span class="badge chip up">🔥 selling fast</span>` : r.x && r.x.never ? `<span class="badge chip flat">❔ never sold</span>` : r.x && r.x.dead ? `<span class="badge chip flat">💤 not moving</span>` : ""}${r.q30 ? `<span class="qty">${r.q30} sold · 30 d</span>` : ""}</div><div class="meta"><span class="sku mono">${r.sku}</span><span class="tp">${r.tipas}${r.x && r.x.counted ? ` · <span style="color:${colour(r.x.colour)};font-weight:700">${r.x.left} in stock</span>` : ""}</span>${sizesLine(r.x)}<div class="sp">${spark(r.spark)}</div></div></button>`).join("")
     + (list.length > shown ? `<div class="more"><button class="btn" id="more">Show ${Math.min(120, list.length - shown)} more of ${list.length}</button></div>` : "");
 }
 $("#sort").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; sort = b.dataset.s; $("#sort").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); shown = 120; renderCards(); });
@@ -388,7 +389,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") $("#modal").
 let stf = "low", stq = "";
 function renderStock() {
   const all = D.stock.map(r => ({ r, x: D.memo.get(r.id) || STK_NONE }));
-  const f = { low: t => t.x.counted && (t.x.colour === "red" || t.x.colour === "orange"), hot: t => t.x.hot, dead: t => t.x.dead, counted: t => t.x.counted, all: () => true }[stf];
+  const f = { low: t => t.x.counted && (t.x.colour === "red" || t.x.colour === "orange"), hot: t => t.x.hot, dead: t => t.x.dead && !t.x.never, never: t => t.x.never, counted: t => t.x.counted, all: () => true }[stf];
   let list = all.filter(t => f(t) && (!stq || `${t.r.sku} ${t.r.size || ""}`.toUpperCase().includes(stq)));
   list.sort((a, b) => (a.x.left_days ?? 1e9) - (b.x.left_days ?? 1e9) || b.x.s30 - a.x.s30);
   const sum = k => all.reduce((n, t) => n + (t.x[k] || 0), 0);
