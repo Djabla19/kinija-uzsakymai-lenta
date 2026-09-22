@@ -216,6 +216,10 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
     const s7 = sum(list, daysAgo(7), now);
     const s30 = sum(list, daysAgo(STK.window), now);
     const s60 = sum(list, daysAgo(STK.dead), now);
+    // Ever sold anything at all. "Stopped selling" and "never started" are
+    // different problems: the first is a real do-not-reorder, the second is
+    // usually a product that was never listed. Must match stock.py `niekada`.
+    const sAll = sum(list, "2000-01-01", now);
     const perDay = s30 / covered;
     const leftDays = (counted && perDay > 0) ? Math.floor(left / perDay) : null;
 
@@ -236,6 +240,7 @@ function stkCompute(rows, stkSales, stkOrders, stkDays) {
       left_days: leftDays, incoming: inc, size: sizeOf(r.size),
       hot: s30 >= 10 && perDay > 0 && (s7 / 7) >= perDay * 1.3,
       dead: counted && left > 0 && s60 === 0,
+      never: counted && left > 0 && sAll === 0,
       colour,
       suggest: (counted && leftDays !== null && leftDays < STK.amber && need > 0)
         ? Math.ceil(need / STK.round) * STK.round : 0,
