@@ -133,12 +133,16 @@ const STOCK_FILTERS = [
   ["have",   "In stock",     p => kiekis(p) > 0],
   ["low",    "Low",          p => p.c === "o"],
   ["almost", "Almost out",   p => p.c === "r" && kiekis(p) > 0],
-  ["out",    "Out of stock", p => p.c && p.c !== "n" && kiekis(p) <= 0],
+  ["out",    "Out of stock", p => p.c && p.c !== "n" && (kiekis(p) <= 0 || nera(p).length > 0)],
   ["hot",    "Selling fast", p => p.t === "hot"],
 ];
 const kiekis = p => Number(p.s) || 0;
 // Bracelets are counted per size (18 / 19 / 20 cm): `sz` = [[size, pieces, colour]…],
 // pieces null when that size has not been counted yet.
+// Sizes that ran out (counted, 0 or less) — shown in red under the card, e.g. "size 6 out of stock".
+const dydis = z => /CM$/i.test(z) ? String(z).replace(/CM$/i, " cm") : `size ${z}`;
+const nera = p => (p.sz || []).filter(([z, n]) => z && n != null && n <= 0).map(([z]) => dydis(z));
+const sizesOut = p => { const v = nera(p); return v.length && kiekis(p) > 0 ? `<div class="sz"><span class="r">${v.join(", ")} out of stock</span></div>` : ""; };
 const sizes = p => p.sz ? `<div class="sz">${p.sz.map(([z, n, c]) => `<span class="${c || ""}">${String(z).replace("CM", "")}: ${n == null ? "–" : n}</span>`).join(" · ")}</div>` : "";
 const $ = s => document.querySelector(s);
 const faile = p => p.f || String(p.sku).toUpperCase().replace(/[^A-Z0-9-]/g, "");
@@ -193,7 +197,7 @@ function render() {
   $("#cards").innerHTML = slice.map(p => {
     const counted = p.c && p.c !== "n";
     const stockTxt = !counted ? "" : kiekis(p) <= 0 ? ` · <span class="r">out of stock</span>` : ` · <span class="${p.c}">${kiekis(p)} ${STOCK_LABELS[p.c] || ""}</span>`;
-    return `<button class="card" data-sku="${p.sku}"><div class="im"><img loading="lazy" decoding="async" src="${thumb(p)}" alt="${p.sku}" onerror="this.remove()">${p.t === "hot" ? `<span class="badge chip up">🔥 selling fast</span>` : p.t === "slow" ? `<span class="badge chip flat">💤 not moving</span>` : ""}${p.q30 ? `<span class="qty">${p.q30} sold · 30 d</span>` : ""}</div><div class="meta"><span class="sku mono">${p.sku}</span><span class="tp">${TIPAI[p.tipas] || p.tipas}${stockTxt}</span>${sizes(p)}<div class="sp">${spark(p.sp || zeros)}</div></div></button>`;
+    return `<button class="card" data-sku="${p.sku}"><div class="im"><img loading="lazy" decoding="async" src="${thumb(p)}" alt="${p.sku}" onerror="this.remove()">${p.t === "hot" ? `<span class="badge chip up">🔥 selling fast</span>` : p.t === "slow" ? `<span class="badge chip flat">💤 not moving</span>` : ""}${p.q30 ? `<span class="qty">${p.q30} sold · 30 d</span>` : ""}</div><div class="meta"><span class="sku mono">${p.sku}</span><span class="tp">${TIPAI[p.tipas] || p.tipas}${stockTxt}</span>${sizes(p)}${sizesOut(p)}<div class="sp">${spark(p.sp || zeros)}</div></div></button>`;
   }).join("") + (list.length > shown ? `<div class="more"><button class="btn" id="more">Show ${Math.min(120, list.length - shown)} more of ${list.length}</button></div>` : "");
 }
 function openModal(p) {
