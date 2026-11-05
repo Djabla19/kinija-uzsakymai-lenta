@@ -837,7 +837,7 @@ function statusCell(r) {
     box.appendChild(sel);
     const s = document.createElement("span");
     s.className = "shipped-ago";
-    s.textContent = r.status === "shipped" ? `shipped ${ago} d ago` : `note: shipped ${ago} d ago`;
+    s.textContent = r.status === "shipped" ? `shipped ${ago} d ago` : `note: ${notePartlyShipped(r.note) ? "part " : ""}shipped ${ago} d ago`;
     if (ago > STK.trip) s.style.color = "var(--s-problem)";
     box.appendChild(s);
     return box;
