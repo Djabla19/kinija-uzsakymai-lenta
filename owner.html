@@ -323,7 +323,7 @@ function renderDash() {
     const ds = daysSinceShipped(o);
     if (o.status === "shipped" && ds > STK.trip) items.push(["warn", `${o.sku} shipped ${ds} days ago`, `not marked received · ${CATS[o.category] || o.category}`]);
     if (o.status !== "received" && o.status !== "problem" && daysSince(o.order_date) > 30) items.push(["warn", `${o.sku} ordered ${daysSince(o.order_date)} days ago`, `still ${o.status} · ${CATS[o.category] || o.category}`]);
-    if (["ordered", "production", "ready"].includes(o.status) && ds >= 0) items.push(["info", `${o.sku} note says shipped`, `status still "${o.status}" — mark it shipped`]);
+    if (["ordered", "production", "ready"].includes(o.status) && ds >= 0 && !notePartlyShipped(o.note)) items.push(["info", `${o.sku} note says shipped`, `status still "${o.status}" — mark it shipped`]);
     if (s10ok(cleanTracking(o.tracking)) === false) items.push(["bad", `${o.sku} tracking looks wrong`, o.tracking]);
     if (o.status === "problem") items.push(["bad", `${o.sku} marked as a problem`, o.note || ""]);
   }
