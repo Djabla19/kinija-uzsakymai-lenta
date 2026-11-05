@@ -36,6 +36,9 @@ function photoNames(sku) {
   // Ir tas pats be dangos priesagos gale („KTC165-A" → „KTC165").
   const be_variantu = (kand[kand.length - 1] || "").replace(/-[A-Z]{1,3}\d?$/, "");
   if (be_variantu && !kand.includes(be_variantu)) kand.push(be_variantu);
+  // Ir pats kodas be jokių variantų („SMOE01-14K-5X8" → „SMOE01").
+  const bazinis = /^[A-Z]+\d+(?=-)/.exec(kand[kand.length - 1] || "");
+  if (bazinis && !kand.includes(bazinis[0])) kand.push(bazinis[0]);
   return kand;
 }
 // The SKU is the key to the photo and to the stock row, so it must be exact:
