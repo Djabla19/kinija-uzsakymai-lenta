@@ -172,7 +172,7 @@ const fmt = n => Number(n || 0).toLocaleString("en-GB");
 const pct = (a, b) => b ? Math.round((a - b) / b * 100) : null;
 const delta = (a, b, suffix) => { const p = pct(a, b); if (p === null) return `<span class="chip flat">new</span><span>${suffix}</span>`; const c = p > 2 ? "up" : p < -2 ? "down" : "flat"; return `<span class="chip ${c}">${p > 0 ? "▲" : p < 0 ? "▼" : "•"} ${Math.abs(p)}%</span><span>${suffix}</span>`; };
 const colour = c => ({ red: "var(--bad)", orange: "var(--warn)", green: "var(--good)", grey: "var(--muted)" })[c] || "var(--muted)";
-const CATS = { silver: "Silver unbranded", pandora: "Pandora", pearl: "Pearl Jewellery", bd: "B/D Modian", ac: "A/C Modian", yg: "YG Jewellery" };
+const CATS = { silver: "Silver unbranded", pandora: "Pandora", pearl: "Pearl Jewellery", bd: "B/D Modian", ac: "A/C Modian", yg: "YG Jewellery", andy: "Andy Jewellery" };
 const faile = p => p.f || String(p.sku).toUpperCase().replace(/[^A-Z0-9-]/g, "");
 const thumb = p => `${DATA.base}/${faile(p)}.webp`;
 const full = p => `${DATA.base}/big/${faile(p)}.webp`;
@@ -192,7 +192,7 @@ async function page(path) {
   }
 }
 // Board categories the supplier ships straight to the buyer (no Gmail label).
-const OTHER_CATS = ["pearl", "bd", "ac", "yg"];
+const OTHER_CATS = ["pearl", "bd", "ac", "yg", "andy"];
 let D = null;
 async function load() {
   const [stock, sales, orders, scans, pers] = await Promise.all([
@@ -276,8 +276,8 @@ function renderDash() {
   const toMake = D.pers.filter(r => !r.delivered && !(r.tracking || "").trim()).length;
   const persShipped = D.pers.filter(r => !r.delivered && (r.tracking || "").trim()).length;
   $("#kpis").innerHTML = [
-    ["Sold · 7 days", s7, delta(s7, p7, "vs previous 7 days") + `<br><span>incl. ${o7} pearls · Modian · YG · engraved</span>`],
-    ["Sold · 30 days", s30, delta(s30, p30, "vs previous 30 days") + `<br><span>incl. ${o30} pearls · Modian · YG · engraved</span>`],
+    ["Sold · 7 days", s7, delta(s7, p7, "vs previous 7 days") + `<br><span>incl. ${o7} pearls · Modian · YG · Andy · engraved</span>`],
+    ["Sold · 30 days", s30, delta(s30, p30, "vs previous 30 days") + `<br><span>incl. ${o30} pearls · Modian · YG · Andy · engraved</span>`],
     ["Units on the way", incoming, `<span>${open.length} open orders</span>`],
     ["Order now", orderNow.length, `<span>${counted} of ${fmt(D.stock.length)} products counted</span>`],
     ["Engraved · to make", toMake, `<span>${persShipped} shipped · ${D.pers.filter(r => r.delivered).length} delivered</span>`],
