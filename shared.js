@@ -76,23 +76,26 @@ function carrierOf(t) {
 
 /* ---------------- shipping date written in a note ----------------
    The partner rarely types a tracking number; she writes "shiped on 24 August"
-   or "will be shiped on 22 Aug" into the note. Same rule as orders.py. */
+   or "will be shiped on 22 Aug" into the note. Same rule as orders.py, except
+   that all-digit dates ("9.1") are only understood there. */
 const SHIP_MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
 function noteShipDate(note) {
   if (!note) return null;
   const t = String(note);
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  let m = /(\d{1,2})\s*(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})/.exec(t), day, mon;
-  if (m && SHIP_MONTHS[m[2].slice(0, 3).toLowerCase()]) { day = +m[1]; mon = SHIP_MONTHS[m[2].slice(0, 3).toLowerCase()]; }
-  else {
-    m = /([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/.exec(t);
-    if (m && SHIP_MONTHS[m[1].slice(0, 3).toLowerCase()]) { day = +m[2]; mon = SHIP_MONTHS[m[1].slice(0, 3).toLowerCase()]; }
-    else {
-      m = /(20\d{2})-(\d{1,2})-(\d{1,2})/.exec(t);
-      if (!m) return null;
-      return new Date(+m[1], +m[2] - 1, +m[3]);
-    }
+  const iso = /(20\d{2})-(\d{1,2})-(\d{1,2})/.exec(t);
+  if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+  let day, mon;
+  // Every match is tried: in "10 shiped on 30 Oct" the first one is "10 shiped".
+  for (const m of t.matchAll(/(\d{1,2})\s*(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})/g)) {
+    const k = SHIP_MONTHS[m[2].slice(0, 3).toLowerCase()];
+    if (k) { day = +m[1]; mon = k; break; }
   }
+  if (!mon) for (const m of t.matchAll(/([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/g)) {
+    const k = SHIP_MONTHS[m[1].slice(0, 3).toLowerCase()];
+    if (k) { day = +m[2]; mon = k; break; }
+  }
+  if (!mon) return null;
   for (const y of [now.getFullYear(), now.getFullYear() - 1]) {
     const d = new Date(y, mon - 1, day);
     if (d.getMonth() !== mon - 1) return null;
@@ -100,8 +103,23 @@ function noteShipDate(note) {
   }
   return null;
 }
+// Several shipments in one note: the last one that already left counts.
+function lastShipDate(note) {
+  const all = String(note || "").split(/[,;]/).map(noteShipDate).filter(Boolean);
+  if (!all.length) return noteShipDate(note);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const past = all.filter(d => d <= now).map(d => d.getTime());
+  return new Date(past.length ? Math.max(...past) : Math.min(...all.map(d => d.getTime())));
+}
+// "10 shiped on 30 Oct, 60 in production": never mark such a row as shipped.
+function notePartlyShipped(note) {
+  const t = String(note || "").toLowerCase();
+  if (/\bin\s*prod|\brest\b|\bremain/.test(t)) return true;
+  const rest = t.replace(/will\s+be\s+ship\w*/g, " ");
+  return rest !== t && rest.includes("ship");
+}
 function daysSinceShipped(row) {         // -1 = unknown (no date in the note)
-  const d = noteShipDate(row.note || "");
+  const d = lastShipDate(row.note || "");
   if (!d) return -1;
   const now = new Date(); now.setHours(0, 0, 0, 0);
   return Math.floor((now - d) / 86400000);
