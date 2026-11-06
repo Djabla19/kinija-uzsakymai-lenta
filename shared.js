@@ -121,6 +121,13 @@ function notePartlyShipped(note) {
   const rest = t.replace(/will\s+be\s+ship\w*/g, " ");
   return rest !== t && rest.includes("ship");
 }
+// "will be shiped on 6 Nov" and nothing else: on 6 Nov it is still only a plan,
+// it counts as shipped from the next day (same rule as orders.py tik_planas).
+function notePlannedOnly(note) {
+  const t = String(note || "").toLowerCase();
+  const rest = t.replace(/will\s+be\s+ship\w*/g, " ");
+  return rest !== t && !rest.includes("ship");
+}
 function daysSinceShipped(row) {         // -1 = unknown (no date in the note)
   const d = lastShipDate(row.note || "");
   if (!d) return -1;
