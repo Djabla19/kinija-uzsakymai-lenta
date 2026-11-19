@@ -118,6 +118,16 @@ function lastShipDate(note) {
 function notePartlyShipped(note) {
   const t = String(note || "").toLowerCase();
   if (/\bin\s*prod|\brest\b|\bremain/.test(t)) return true;
+  // "10 will be shiped on 13 Nov, 25 will be shiped on 20 Nov": the second part's
+  // day has not come yet (on the day itself a plan is not a fact either).
+  const parts = t.split(/[,;]/).filter(p => p.trim());
+  if (parts.length > 1) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    for (const p of parts) {
+      const d = noteShipDate(p);
+      if (d && (d > now || (d.getTime() === now.getTime() && /will\s+be/.test(p)))) return true;
+    }
+  }
   const rest = t.replace(/will\s+be\s+ship\w*/g, " ");
   return rest !== t && rest.includes("ship");
 }
