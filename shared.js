@@ -129,7 +129,11 @@ function notePartlyShipped(note) {
     }
   }
   const rest = t.replace(/will\s+be\s+ship\w*/g, " ");
-  return rest !== t && rest.includes("ship");
+  if (!(rest !== t && rest.includes("ship"))) return false;
+  // Fact + plan: a planned part whose day has passed counts as shipped (same rule as
+  // notePlannedOnly). Partial only when the plan has no readable date (future dates were
+  // caught above). 2026-11-23: TTE162 "20 will be shiped on 13 Nov, 30 shiped 21 Nov".
+  return (parts.length ? parts : [t]).some(p => /will\s+be/.test(p) && !noteShipDate(p));
 }
 // "will be shiped on 6 Nov" and nothing else: on 6 Nov it is still only a plan,
 // it counts as shipped from the next day (same rule as orders.py tik_planas).
